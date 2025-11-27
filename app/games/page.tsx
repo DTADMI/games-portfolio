@@ -11,7 +11,7 @@ const GAMES = [
     title: 'Snake Game',
     description: 'Classic snake game with modern twist and smooth animations',
     image: '/images/games/snake-preview.jpg',
-    tags: ['Classic', 'Arcade', 'Single Player'],
+    tags: ['Classic', 'Arcade'],
     featured: true,
   },
   {
@@ -19,7 +19,7 @@ const GAMES = [
     title: 'Memory Card Game',
     description: 'Test your memory with this fun card matching game',
     image: '/images/games/memory-preview.jpg',
-    tags: ['Puzzle', 'Memory', 'Single Player'],
+    tags: ['Puzzle', 'Memory'],
     featured: true,
   },
   {
@@ -27,7 +27,7 @@ const GAMES = [
     title: 'Breakout',
     description: 'Break all the bricks with the ball and avoid missing it',
     image: '/images/games/breakout-preview.jpg',
-    tags: ['Arcade', 'Action', 'Single Player'],
+    tags: ['Arcade', 'Action'],
     featured: true,
   },
   {
@@ -35,7 +35,7 @@ const GAMES = [
     title: 'Tetris',
     description: 'Classic tile-matching puzzle game',
     image: '/images/games/tetris-preview.jpg',
-    tags: ['Puzzle', 'Arcade', 'Single Player'],
+    tags: ['Puzzle', 'Arcade'],
     comingSoon: true,
   },
   {
@@ -73,8 +73,9 @@ export default function GamesPage() {
 
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {GAMES.map((game) => (
-            <div
+            <Link
               key={game.id}
+              href={`/games/${game.id}`}
               className="group bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
             >
               <div className="relative h-48 bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -123,7 +124,7 @@ export default function GamesPage() {
                   </button>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
