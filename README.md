@@ -152,3 +152,62 @@ Follow comments in `infra/cloudrun/*.yaml` to wire Cloud SQL (private IP recomme
 ## Contributing
 - Pre-commit hooks will lint and format staged files.
 - Keep semicolons and braces per ESLint rules; prefer clarity.
+
+
+## Observability Profile (optional)
+To run the observability stack only when needed, use Docker Compose profiles:
+
+```bash
+# Start core stack (Postgres, Redis, backend, frontend)
+docker compose up -d
+
+# Start with observability (Elasticsearch, Logstash, Kibana, Prometheus, Grafana, Filebeat)
+docker compose --profile observability up -d
+
+# Later, stop only observability services
+docker compose --profile observability stop
+```
+
+Services behind the `observability` profile:
+- Elasticsearch, Logstash, Kibana (ELK)
+- Prometheus, Grafana
+- Filebeat
+
+The core application services run without this profile.
+
+## Games in App Router
+All games are consolidated under the Next.js App Router at `frontend/app/games`:
+- `/games` — gallery
+- `/games/snake` — Snake
+- `/games/memory` — Memory
+- `/games/breakout` — Breakout
+
+Game components remain authored under `games/*` packages and are imported via monorepo aliases configured in `next.config.ts`.
+
+## Bun as the JS runtime
+This repo is standardized on Bun. Typical commands:
+```bash
+bun install
+bun run dev
+bun run build
+bun run test
+```
+
+## Color palette suggestion
+A modern, accessible palette with strong dark-mode support:
+- Primary (emerald): 600 `#059669`, 700 `#047857`
+- Secondary (indigo): 600 `#4F46E5`, 700 `#4338CA`
+- Accent (amber): 500 `#F59E0B`
+- Foreground: `#0F172A` (slate-900), `#111827` (gray-900)
+- Background (light): `#F8FAFC` (slate-50)
+- Background (dark): `#0B1020`
+
+These can map to CSS variables in `globals.css` and be consumed by shadcn/ui components for consistent theming.
+
+## Next steps: UX and multiplayer enhancements
+Planned, feature-flagged improvements for engagement:
+- UX: pause/resume, touch controls, sound/music toggles, difficulty presets, persistent high scores
+- Social: session-based nicknames, shareable score cards
+- Realtime: basic presence and live leaderboard via backend WebSocket channel
+
+Please confirm which game to prioritize for the first multiplayer prototype (Snake or Breakout recommended). Once confirmed, we’ll wire the backend WS topic, add client hooks, and ship tests (integration + e2e).

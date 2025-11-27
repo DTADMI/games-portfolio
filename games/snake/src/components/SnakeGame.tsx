@@ -10,6 +10,7 @@ export const SnakeGame: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [leaderboard, setLeaderboard] = useState<number[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [config, setConfig] = useState<GameConfig>({
     mode: 'classic',
@@ -26,6 +27,16 @@ export const SnakeGame: React.FC = () => {
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [portals, setPortals] = useState<Portal[]>([]);
   const [gameLoop, setGameLoop] = useState<NodeJS.Timeout | null>(null);
+
+  // Load persisted scores on mount
+  useEffect(() => {
+    try {
+      const savedHigh = parseInt(localStorage.getItem('snakeHighScore') || '0', 10);
+      if (!isNaN(savedHigh)) setHighScore(savedHigh);
+      const savedBoard = JSON.parse(localStorage.getItem('snakeLeaderboard') || '[]');
+      if (Array.isArray(savedBoard)) setLeaderboard(savedBoard);
+    } catch {}
+  }, []);
 
   // Initialize game
   const initGame = useCallback(() => {
@@ -421,8 +432,25 @@ export const SnakeGame: React.FC = () => {
       if (gameLoop) {
         clearInterval(gameLoop);
       }
+      // Dispatch a public gameover event for external integrations (e.g., STOMP score submit)
+      try {
+        window.dispatchEvent(new CustomEvent('snake:gameover', { detail: { score } }));
+      } catch {}
+      // Update local high score and leaderboard
+      try {
+        // Save high score
+        localStorage.setItem('snakeHighScore', String(highScore));
+        // Update leaderboard with current score
+        const existing = JSON.parse(localStorage.getItem('snakeLeaderboard') || '[]');
+        const next = Array.isArray(existing) ? existing : [];
+        next.push(score);
+        const top = next.filter(n => typeof n === 'number' && !isNaN(n)).sort((a, b) => b - a).slice(0, 10);
+        localStorage.setItem('snakeLeaderboard', JSON.stringify(top));
+        setLeaderboard(top);
+        try { window.dispatchEvent(new Event('snake:leaderboardUpdated')); } catch {}
+      } catch {}
     }
-  }, [gameOver, gameLoop]);
+  }, [gameOver, gameLoop, highScore, score]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -433,6 +461,50 @@ export const SnakeGame: React.FC = () => {
       soundManager.stopCurrentMusic();
     };
   }, [gameLoop]);
+
+  // Handle difficulty changes via a custom DOM event dispatched by the page wrapper UI
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { difficulty?: 'easy' | 'normal' | 'hard' } | undefined;
+      const difficulty = detail?.difficulty ?? 'normal';
+      // Map difficulty to speed and grid size
+      const baseSpeed = GAME_SPEED; // lower is faster
+      const baseGrid = GRID_SIZE;
+      let nextSpeed = baseSpeed;
+      let nextGrid = baseGrid;
+      switch (difficulty) {
+        case 'easy':
+          nextSpeed = Math.min(300, baseSpeed + 50);
+          nextGrid = Math.max(12, baseGrid - 4);
+          break;
+        case 'hard':
+          nextSpeed = Math.max(60, baseSpeed - 50);
+          nextGrid = Math.min(32, baseGrid + 4);
+          break;
+        default:
+          nextSpeed = baseSpeed;
+          nextGrid = baseGrid;
+      }
+      setConfig(prev => ({ ...prev, speed: nextSpeed, gridSize: nextGrid }));
+      try {
+        localStorage.setItem('snakeDifficulty', difficulty);
+      } catch {}
+    };
+
+    window.addEventListener('snake:setDifficulty', handler as EventListener);
+
+    // Apply saved or default difficulty on mount
+    try {
+      const saved = (localStorage.getItem('snakeDifficulty') as 'easy' | 'normal' | 'hard' | null) || 'normal';
+      window.dispatchEvent(new CustomEvent('snake:setDifficulty', { detail: { difficulty: saved } }));
+    } catch {
+      window.dispatchEvent(new CustomEvent('snake:setDifficulty', { detail: { difficulty: 'normal' } }));
+    }
+
+    return () => {
+      window.removeEventListener('snake:setDifficulty', handler as EventListener);
+    };
+  }, []);
 
   // Handle game mode changes
   const handleModeChange = (mode: GameMode) => {

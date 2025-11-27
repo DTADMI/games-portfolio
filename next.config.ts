@@ -1,30 +1,30 @@
 import type { NextConfig } from "next";
+import path from 'path';
 
 const nextConfig: NextConfig = {
-    // Enable React Strict Mode
     reactStrictMode: true,
-
-    // Enable SWC minification
     swcMinify: true,
 
-    // Configure images
     images: {
         domains: ['images.unsplash.com', 'via.placeholder.com'],
     },
 
-    // Webpack configuration for monorepo
-    webpack: (config, { isServer }) => {
-        // Add support for importing from shared packages
-        if (!isServer) {
-            config.resolve.alias['@games/shared'] = require.resolve('@games/shared');
-        }
-
+    webpack: (config) => {
+        // Resolve aliases to enable importing game packages from the monorepo
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            '@games/shared': path.resolve(__dirname, 'libs/shared/src'),
+            '@games/snake': path.resolve(__dirname, 'games/snake/src'),
+            '@games/memory': path.resolve(__dirname, 'games/memory/src'),
+            '@games/breakout': path.resolve(__dirname, 'games/breakout/src'),
+            '@games/tetris': path.resolve(__dirname, 'games/tetris/src'),
+        };
         return config;
     },
 
-    // Environment variables
     env: {
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
+        NEXT_PUBLIC_FEATURE_REALTIME: process.env.NEXT_PUBLIC_FEATURE_REALTIME || 'false',
     },
 };
 
