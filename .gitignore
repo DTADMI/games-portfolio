@@ -201,3 +201,4 @@ dist/**/*.js.map
 # TypeScript v1 declaration files
 typings/
 !/frontend/.idea/
+!/.idea/
