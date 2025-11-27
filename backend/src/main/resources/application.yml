@@ -1,0 +1,75 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+app:
+  jwtSecret: your_jwt_secret_key_here_make_it_secure
+  jwtExpirationInMs: 86400000 # 24 hours
+
+spring:
+  application:
+    name: games-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/gamesdb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=300s
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+ff4j:
+  web:
+    api:
+      enable: true
+  console:
+    enable: true
+  audit: true
+  autoCreate: true
+
+bucket4j:
+  enabled: true
+  filters:
+    - cache-name=buckets
+      url=/**
+      http-response-body="{\"status\":429, \"error\":\"Too Many Requests\",\"message\":\"You have exhausted your API Request Quota\"}"
+      rate-limits:
+          - bandwidths:
+            - capacity: 100
+              time: 1
+              unit: minutes
+            url=/api/.*
+
+# CORS configuration
+cors:
+  allowed-origins: http://localhost:3000
+  allowed-methods: GET, POST, PUT, DELETE, OPTIONS
+  allowed-headers: *
+  allow-credentials: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    web:
+      server:
+        request:
+          autotime:
+            enabled: true

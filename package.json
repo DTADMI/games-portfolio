@@ -1,0 +1,22 @@
+{
+  "name": "react-games-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "games/*",
+    "libs/*"
+  ],
+  "scripts": {
+    "start:frontend": "yarn workspace frontend dev",
+    "build:frontend": "yarn workspace frontend build",
+    "start:backend": "cd backend && ./mvnw spring-boot:run",
+    "build:backend": "cd backend && ./mvnw clean package",
+    "start": "concurrently \"yarn start:backend\" \"yarn start:frontend\"",
+    "build": "yarn build:backend && yarn build:frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "packageManager": "yarn@3.6.1"
+}
