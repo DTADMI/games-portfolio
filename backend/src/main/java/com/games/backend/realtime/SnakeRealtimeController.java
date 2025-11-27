@@ -1,7 +1,10 @@
 package com.games.backend.realtime;
 
 import com.games.backend.realtime.dto.RealtimeDtos.*;
+import com.games.backend.service.LeaderboardService;
+import com.games.backend.service.PresenceService;
 import com.games.backend.service.ProfanityFilter;
+import com.games.backend.service.RunIdService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -12,8 +15,6 @@ import org.springframework.validation.annotation.Validated;
 
 import java.security.Principal;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 @Validated
@@ -22,35 +23,46 @@ public class SnakeRealtimeController {
 
     private final SimpMessagingTemplate broker;
     private final ProfanityFilter profanityFilter;
+    private final PresenceService presenceService;
+    private final LeaderboardService leaderboardService;
+    private final RunIdService runIdService;
 
     @Value("${features.realtimeEnabled:true}")
     private boolean realtimeEnabled;
 
-    public SnakeRealtimeController(SimpMessagingTemplate broker, ProfanityFilter profanityFilter) {
+    @Value("${features.antiCheatEnabled:false}")
+    private boolean antiCheatEnabled;
+
+    public SnakeRealtimeController(SimpMessagingTemplate broker,
+                                   ProfanityFilter profanityFilter,
+                                   PresenceService presenceService,
+                                   LeaderboardService leaderboardService,
+                                   RunIdService runIdService) {
         this.broker = broker;
         this.profanityFilter = profanityFilter;
+        this.presenceService = presenceService;
+        this.leaderboardService = leaderboardService;
+        this.runIdService = runIdService;
     }
-
-    // In-memory presence and leaderboard (swap with Redis later)
-    private final Set<String> online = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final ConcurrentMap<String, Integer> leaderboard = new ConcurrentHashMap<>(); // nickname -> best
 
     @MessageMapping("/snake/presence")
     public void presence(@Valid @Payload Envelope<@Valid PresenceIn> env, Principal principal) {
         if (!realtimeEnabled || env == null) return;
-        String userKey = principal != null && principal.getName() != null ? principal.getName() : UUID.randomUUID().toString();
-        if (env.user != null && env.user.nickname != null) {
-            userKey = env.user.nickname + "|" + userKey;
-        }
+        String nickname = (env.user != null && env.user.nickname != null) ? env.user.nickname : "guest";
+        String principalId = (principal != null && principal.getName() != null) ? principal.getName() : UUID.randomUUID().toString();
+        String memberId = nickname + "|" + principalId;
+        String roomId = (env.room != null && env.room.id != null) ? env.room.id : "snake:global";
+
         String status = env.payload != null ? env.payload.status : "heartbeat";
         switch (status == null ? "heartbeat" : status) {
-            case "join" -> online.add(userKey);
-            case "leave" -> online.remove(userKey);
-            default -> online.add(userKey);
+            case "join" -> presenceService.join(roomId, memberId);
+            case "leave" -> presenceService.leave(roomId, memberId);
+            default -> presenceService.heartbeat(roomId, memberId);
         }
+
         PresenceOut out = new PresenceOut();
-        out.count = online.size();
-        out.users = online.stream().limit(20).map(k -> {
+        out.count = presenceService.count(roomId);
+        out.users = presenceService.sample(roomId, 20).stream().map(k -> {
             PublicUser pu = new PublicUser();
             pu.id = k;
             pu.nickname = k.split("\\|")[0];
@@ -69,23 +81,19 @@ public class SnakeRealtimeController {
     public void score(@Valid @Payload Envelope<@Valid ScoreIn> env) {
         if (!realtimeEnabled || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
         int value = Math.max(0, env.payload.value);
-        // Heuristic anti-cheat: clamp max and ignore obviously invalid
-        if (value > 1000000) return;
-        leaderboard.merge(env.user.nickname, value, Math::max);
-        List<Entry> top = leaderboard.entrySet().stream()
-                .sorted((a,b) -> Integer.compare(b.getValue(), a.getValue()))
-                .limit(10)
-                .map(e -> { Entry en = new Entry(); en.nickname = e.getKey(); en.value = e.getValue(); return en; })
-                .collect(Collectors.toList());
-        LeaderboardOut out = new LeaderboardOut();
-        out.top = top;
-        Integer yourRank = null;
-        int idx = 1;
-        for (Map.Entry<String,Integer> e : leaderboard.entrySet().stream().sorted((a,b) -> Integer.compare(b.getValue(), a.getValue())).toList()) {
-            if (e.getKey().equals(env.user.nickname)) { yourRank = idx; break; }
-            idx++;
+        if (value > 1_000_000) return; // clamp
+        if (antiCheatEnabled) {
+            String runId = env.payload.runId;
+            if (!runIdService.validateAndConsume(runId)) {
+                return; // reject without broadcasting
+            }
         }
-        out.yourRank = yourRank;
+        String scope = (env.room != null && env.room.id != null) ? env.room.id : "snake:global";
+        leaderboardService.submit(scope, env.user.nickname, value);
+
+        LeaderboardOut out = new LeaderboardOut();
+        out.top = leaderboardService.topN(scope, 10);
+        out.yourRank = leaderboardService.rankOf(scope, env.user.nickname);
 
         Envelope<LeaderboardOut> res = new Envelope<>();
         res.type = "leaderboard";
