@@ -1,5 +1,7 @@
 package com.games.backend.config;
 
+import com.games.backend.security.CustomUserDetailsService;
+import com.games.backend.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,8 +15,12 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -27,6 +33,14 @@ import java.util.Map;
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final JwtTokenProvider tokenProvider;
+    private final CustomUserDetailsService userDetailsService;
+
+    public WebSocketConfig(JwtTokenProvider tokenProvider, CustomUserDetailsService userDetailsService) {
+        this.tokenProvider = tokenProvider;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -76,8 +90,25 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
                         message, StompHeaderAccessor.class);
                 if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-                    Authentication user = SecurityContextHolder.getContext().getAuthentication();
-                    accessor.setUser(user);
+                    // Try to set Principal from JWT "Authorization" connect header if provided
+                    String authHeader = accessor.getFirstNativeHeader("Authorization");
+                    if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+                        String token = authHeader.substring(7);
+                        try {
+                            if (tokenProvider.validateToken(token)) {
+                                String username = tokenProvider.getUsernameFromJWT(token);
+                                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                                Authentication authentication = new UsernamePasswordAuthenticationToken(
+                                        userDetails, null, userDetails.getAuthorities());
+                                accessor.setUser(authentication);
+                            }
+                        } catch (Exception ignored) { }
+                    }
+                    // Fallback to request security context (may be null)
+                    if (accessor.getUser() == null) {
+                        Authentication user = SecurityContextHolder.getContext().getAuthentication();
+                        accessor.setUser(user);
+                    }
                 }
                 return message;
             }

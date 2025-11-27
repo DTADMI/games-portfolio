@@ -1,11 +1,14 @@
 package com.games.backend.realtime;
 
 import com.games.backend.realtime.dto.RealtimeDtos.*;
-import org.springframework.messaging.handler.annotation.DestinationVariable;
+import com.games.backend.service.ProfanityFilter;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.annotation.Validated;
 
 import java.security.Principal;
 import java.util.*;
@@ -13,13 +16,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
+@Validated
 @Controller
 public class SnakeRealtimeController {
 
     private final SimpMessagingTemplate broker;
+    private final ProfanityFilter profanityFilter;
 
-    public SnakeRealtimeController(SimpMessagingTemplate broker) {
+    @Value("${features.realtimeEnabled:true}")
+    private boolean realtimeEnabled;
+
+    public SnakeRealtimeController(SimpMessagingTemplate broker, ProfanityFilter profanityFilter) {
         this.broker = broker;
+        this.profanityFilter = profanityFilter;
     }
 
     // In-memory presence and leaderboard (swap with Redis later)
@@ -27,12 +36,13 @@ public class SnakeRealtimeController {
     private final ConcurrentMap<String, Integer> leaderboard = new ConcurrentHashMap<>(); // nickname -> best
 
     @MessageMapping("/snake/presence")
-    public void presence(@Payload Envelope<PresenceIn> env, Principal principal) {
+    public void presence(@Valid @Payload Envelope<@Valid PresenceIn> env, Principal principal) {
+        if (!realtimeEnabled || env == null) return;
         String userKey = principal != null && principal.getName() != null ? principal.getName() : UUID.randomUUID().toString();
-        if (env != null && env.user != null && env.user.nickname != null) {
+        if (env.user != null && env.user.nickname != null) {
             userKey = env.user.nickname + "|" + userKey;
         }
-        String status = env != null && env.payload != null ? env.payload.status : "heartbeat";
+        String status = env.payload != null ? env.payload.status : "heartbeat";
         switch (status == null ? "heartbeat" : status) {
             case "join" -> online.add(userKey);
             case "leave" -> online.remove(userKey);
@@ -49,15 +59,15 @@ public class SnakeRealtimeController {
 
         Envelope<PresenceOut> res = new Envelope<>();
         res.type = "presence";
-        res.room = env != null ? env.room : null;
-        res.user = env != null ? env.user : null;
+        res.room = env.room;
+        res.user = env.user;
         res.payload = out;
         broker.convertAndSend("/topic/snake/presence", res);
     }
 
     @MessageMapping("/snake/score")
-    public void score(@Payload Envelope<ScoreIn> env) {
-        if (env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
+    public void score(@Valid @Payload Envelope<@Valid ScoreIn> env) {
+        if (!realtimeEnabled || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
         int value = Math.max(0, env.payload.value);
         // Heuristic anti-cheat: clamp max and ignore obviously invalid
         if (value > 1000000) return;
@@ -86,10 +96,14 @@ public class SnakeRealtimeController {
     }
 
     @MessageMapping("/snake/chat")
-    public void chat(@Payload Envelope<ChatIn> env) {
-        if (env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
+    public void chat(@Valid @Payload Envelope<@Valid ChatIn> env) {
+        if (!realtimeEnabled || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
         String text = env.payload.text == null ? "" : env.payload.text.trim();
-        if (text.isBlank() || text.length() > 300) return;
+        if (text.isBlank()) return;
+        text = profanityFilter.filter(text);
+        if (text.length() > 300) {
+            text = text.substring(0, 300);
+        }
         ChatOut out = new ChatOut();
         out.nickname = env.user.nickname;
         out.text = text;

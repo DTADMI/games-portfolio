@@ -1,48 +1,39 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
 import js from '@eslint/js';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
 import nextPlugin from 'eslint-config-next';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-});
-
-const eslintConfig = [
-  // Use the Next.js config directly
-  ...compat.config(nextPlugin),
+export default [
+  // Base recommended config
+  js.configs.recommended,
+  
+  // Next.js config
+  ...nextPlugin,
+  
+  // React configuration
   {
-    name: "global-rules",
-    files: ["**/*.{js,jsx,ts,tsx}"],
-    languageOptions: {
-      ecmaVersion: 2023,
-      sourceType: "module",
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: {
+      'react': reactPlugin,
+      'react-hooks': reactHooks,
+    },
+    settings: {
+      react: {
+        version: 'detect',
+      },
     },
     rules: {
-      semi: ["error", "always"],
-      curly: ["error", "all"],
-      eqeqeq: ["error", "always"],
-      "no-var": "error",
-      "prefer-const": "error",
-      "no-multiple-empty-lines": ["error", { max: 1, maxBOF: 0, maxEOF: 1 }],
-      "no-trailing-spaces": "error",
-      "object-curly-spacing": ["error", "always"],
-      "array-bracket-spacing": ["error", "never"],
-      "space-before-blocks": ["error", "always"],
-      "keyword-spacing": ["error", { before: true, after: true }],
-      "comma-dangle": ["error", "always-multiline"],
-      "padding-line-between-statements": [
-        "error",
-        { blankLine: "always", prev: ["const", "let", "var"], next: "*" },
-        { blankLine: "always", prev: "block-like", next: "*" },
-        { blankLine: "always", prev: "*", next: "return" },
-      ],
+      // React rules
+      'react/react-in-jsx-scope': 'off', // Not needed with Next.js
+      'react/prop-types': 'off', // Not needed with TypeScript
+      
+      // React Hooks rules
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      
+      // Custom rules
+      'semi': ['error', 'always'],
+      'curly': ['error', 'all'],
     },
   },
 ];
-
-export default eslintConfig;

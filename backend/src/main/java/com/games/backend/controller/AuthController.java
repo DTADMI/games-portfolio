@@ -1,22 +1,26 @@
 // src/main/java/com/games/backend/controller/AuthController.java
 package com.games.backend.controller;
 
+import com.games.backend.model.RefreshToken;
 import com.games.backend.model.User;
 import com.games.backend.repository.UserRepository;
 import com.games.backend.security.JwtTokenProvider;
+import com.games.backend.security.CustomUserDetailsService;
+import com.games.backend.service.RefreshTokenService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,17 +30,26 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final RefreshTokenService refreshTokenService;
+    private final CustomUserDetailsService userDetailsService;
+
+    @Value("${app.jwtExpirationInMs:3600000}")
+    private int jwtExpirationInMs;
 
     public AuthController(
             AuthenticationManager authenticationManager,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtTokenProvider tokenProvider
+            JwtTokenProvider tokenProvider,
+            RefreshTokenService refreshTokenService,
+            CustomUserDetailsService userDetailsService
     ) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.refreshTokenService = refreshTokenService;
+        this.userDetailsService = userDetailsService;
     }
 
     @PostMapping("/login")
@@ -49,11 +62,20 @@ public class AuthController {
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = tokenProvider.generateToken(authentication);
+        String accessToken = tokenProvider.generateToken(authentication);
+
+        // Issue refresh token
+        Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
+        }
+        RefreshToken rt = refreshTokenService.issue(userOpt.get());
 
         Map<String, Object> response = new HashMap<>();
-        response.put("accessToken", jwt);
+        response.put("accessToken", accessToken);
+        response.put("refreshToken", rt.getToken());
         response.put("tokenType", "Bearer");
+        response.put("expiresIn", jwtExpirationInMs);
 
         return ResponseEntity.ok(response);
     }
@@ -72,7 +94,62 @@ public class AuthController {
 
         userRepository.save(user);
 
-        return ResponseEntity.ok("User registered successfully");
+        // Auto login: issue tokens using a proper principal
+        UserDetails ud = userDetailsService.loadUserByUsername(user.getEmail());
+        Authentication authentication = new UsernamePasswordAuthenticationToken(ud, null, ud.getAuthorities());
+        String accessToken = tokenProvider.generateToken(authentication);
+        RefreshToken rt = refreshTokenService.issue(user);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "User registered successfully");
+        response.put("accessToken", accessToken);
+        response.put("refreshToken", rt.getToken());
+        response.put("tokenType", "Bearer");
+        response.put("expiresIn", jwtExpirationInMs);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody RefreshRequest req) {
+        if (req == null || req.getRefreshToken() == null || req.getRefreshToken().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "refreshToken required"));
+        }
+        Optional<RefreshToken> valid = refreshTokenService.findValid(req.getRefreshToken());
+        if (valid.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "invalid or expired refresh token"));
+        }
+        RefreshToken rotated = refreshTokenService.rotate(valid.get());
+        User user = rotated.getUser();
+        UserDetails ud = userDetailsService.loadUserByUsername(user.getEmail());
+        Authentication auth = new UsernamePasswordAuthenticationToken(ud, null, ud.getAuthorities());
+        String newAccess = tokenProvider.generateToken(auth);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("accessToken", newAccess);
+        response.put("refreshToken", rotated.getToken());
+        response.put("tokenType", "Bearer");
+        response.put("expiresIn", jwtExpirationInMs);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me(@AuthenticationPrincipal UserDetails principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        String email = principal.getUsername();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+        }
+        User u = userOpt.get();
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", u.getId());
+        body.put("email", u.getEmail());
+        body.put("username", u.getUsername());
+        body.put("roles", u.getRoles());
+        return ResponseEntity.ok(body);
     }
 }
 
@@ -125,4 +202,11 @@ class SignUpRequest {
     public void setPassword(String password) {
         this.password = password;
     }
+}
+
+class RefreshRequest {
+    private String refreshToken;
+
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
 }
