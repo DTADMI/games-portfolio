@@ -1,0 +1,35 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: games-frontend
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/client-name: "games-portfolio"
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+    spec:
+      containers:
+        - image: gcr.io/PROJECT_ID/games-frontend:latest
+          ports:
+            - name: http1
+              containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: BACKEND_URL
+              value: https://games-backend-<hash>-<region>.a.run.app
+            - name: NEXTAUTH_URL
+              value: https://games-frontend-<hash>-<region>.a.run.app
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: games-secrets
+                  key: NEXTAUTH_SECRET
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi

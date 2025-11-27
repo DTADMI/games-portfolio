@@ -1,8 +1,30 @@
-// backend/src/main/java/com/games/backend/security/RateLimitFilter.java
+package com.games.backend.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.filter.OncePerRequestFilter;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.util.List;
+
 public class RateLimitFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(RateLimitFilter.class);
-    private final RateLimiterRegistry rateLimiterRegistry;
+
+    private final RateLimiter rateLimiter;
     private final List<String> excludedPaths = List.of("/actuator/health", "/error");
+
+    public RateLimitFilter(RateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -17,18 +39,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String clientIp = getClientIP(request);
-        String key = "rate_limit:" + clientIp + ":" + requestUri;
-
-        RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(key, () ->
-                RateLimiterConfig.custom()
-                        .limitForPeriod(100)
-                        .limitRefreshPeriod(Duration.ofMinutes(1))
-                        .timeoutDuration(Duration.ofSeconds(5))
-                        .build()
-        );
+        int limit = rateLimiter.getRateLimiterConfig().getLimitForPeriod();
 
         try {
             boolean permission = rateLimiter.acquirePermission();
+            int remaining = Math.max(0, (int) rateLimiter.getMetrics().getAvailablePermissions());
+            response.setHeader("X-RateLimit-Limit", String.valueOf(limit));
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(remaining));
+
             if (permission) {
                 filterChain.doFilter(request, response);
             } else {
@@ -41,34 +59,28 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private String getClientIP(HttpServletRequest request) {
         String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader != null) {
-            return xfHeader.split(",")[0];
+        if (xfHeader != null && !xfHeader.isBlank()) {
+            return xfHeader.split(",")[0].trim();
         }
         return request.getRemoteAddr();
     }
 
     private void rateLimitExceeded(HttpServletResponse response, String clientIp, String requestUri) throws IOException {
-        String requestUri = request.getRequestURI();
         logger.warn("Rate limit exceeded for {} - {}", clientIp, requestUri);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(Duration.ofMinutes(1).toSeconds()));
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write("""
-            {
-                "error": "Too many requests",
-                "message": "Rate limit exceeded. Please try again later."
-            }
+            {"error":"Too many requests","message":"Rate limit exceeded. Please try again later."}
             """);
     }
 
     private void handleRateLimitError(HttpServletResponse response, Exception e) throws IOException {
-        log.error("Rate limiting error", e);
+        logger.error("Rate limiting error", e);
         response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write("""
-            {
-                "error": "Internal server error",
-                "message": "An error occurred while processing your request."
-            }
+            {"error":"Internal server error","message":"An error occurred while processing your request."}
             """);
     }
 }
