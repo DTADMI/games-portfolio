@@ -1,0 +1,14 @@
+**/node_modules/**
+**/.next/**
+**/out/**
+**/build/**
+**/dist/**
+**/public/**
+**/cypress/**
+**/tests-e2e/**
+**/__tests__/**
+**/*.config.js
+**/*.config.ts
+**/tailwind.config.js
+**/vitest.config.ts
+**/playwright.config.ts
