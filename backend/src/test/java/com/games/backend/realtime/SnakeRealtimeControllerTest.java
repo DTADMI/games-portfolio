@@ -18,23 +18,29 @@ class SnakeRealtimeControllerTest {
 
     private SimpMessagingTemplate broker;
     private ProfanityFilter profanity;
+    private PresenceService presenceService;
+    private LeaderboardService leaderboardService;
+    private RunIdService runIdService;
+    private FeatureFlagsService flags;
     private SnakeRealtimeController controller;
 
     @BeforeEach
     void setup() {
         broker = mock(SimpMessagingTemplate.class);
         profanity = mock(ProfanityFilter.class);
+        presenceService = mock(PresenceService.class);
+        leaderboardService = mock(LeaderboardService.class);
+        runIdService = mock(RunIdService.class);
+        flags = mock(FeatureFlagsService.class);
         when(profanity.filter(anyString())).thenAnswer(inv -> inv.getArgument(0));
-        controller = new SnakeRealtimeController(broker, profanity);
-        setRealtimeEnabled(true);
+        when(flags.isEnabled("realtime_enabled")).thenReturn(true);
+        when(flags.isEnabled("anti_cheat_enabled")).thenReturn(false);
+        when(leaderboardService.topN(anyString(), anyInt())).thenReturn(List.of());
+        controller = new SnakeRealtimeController(broker, profanity, presenceService, leaderboardService, runIdService, flags);
     }
 
     private void setRealtimeEnabled(boolean v) {
-        try {
-            Field f = SnakeRealtimeController.class.getDeclaredField("realtimeEnabled");
-            f.setAccessible(true);
-            f.setBoolean(controller, v);
-        } catch (Exception ignored) {}
+        when(flags.isEnabled("realtime_enabled")).thenReturn(v);
     }
 
     private static Envelope<PresenceIn> presenceEnv(String nickname, String status) {

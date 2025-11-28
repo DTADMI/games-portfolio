@@ -1,12 +1,12 @@
 package com.games.backend.realtime;
 
+import com.games.backend.features.FeatureFlagsService;
 import com.games.backend.realtime.dto.RealtimeDtos.*;
 import com.games.backend.service.LeaderboardService;
 import com.games.backend.service.PresenceService;
 import com.games.backend.service.ProfanityFilter;
 import com.games.backend.service.RunIdService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,28 +26,25 @@ public class SnakeRealtimeController {
     private final PresenceService presenceService;
     private final LeaderboardService leaderboardService;
     private final RunIdService runIdService;
-
-    @Value("${features.realtimeEnabled:true}")
-    private boolean realtimeEnabled;
-
-    @Value("${features.antiCheatEnabled:false}")
-    private boolean antiCheatEnabled;
+    private final FeatureFlagsService flags;
 
     public SnakeRealtimeController(SimpMessagingTemplate broker,
                                    ProfanityFilter profanityFilter,
                                    PresenceService presenceService,
                                    LeaderboardService leaderboardService,
-                                   RunIdService runIdService) {
+                                   RunIdService runIdService,
+                                   FeatureFlagsService flags) {
         this.broker = broker;
         this.profanityFilter = profanityFilter;
         this.presenceService = presenceService;
         this.leaderboardService = leaderboardService;
         this.runIdService = runIdService;
+        this.flags = flags;
     }
 
     @MessageMapping("/snake/presence")
     public void presence(@Valid @Payload Envelope<@Valid PresenceIn> env, Principal principal) {
-        if (!realtimeEnabled || env == null) return;
+        if (!flags.isEnabled("realtime_enabled") || env == null) return;
         String nickname = (env.user != null && env.user.nickname != null) ? env.user.nickname : "guest";
         String principalId = (principal != null && principal.getName() != null) ? principal.getName() : UUID.randomUUID().toString();
         String memberId = nickname + "|" + principalId;
@@ -79,10 +76,10 @@ public class SnakeRealtimeController {
 
     @MessageMapping("/snake/score")
     public void score(@Valid @Payload Envelope<@Valid ScoreIn> env) {
-        if (!realtimeEnabled || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
+        if (!flags.isEnabled("realtime_enabled") || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
         int value = Math.max(0, env.payload.value);
         if (value > 1_000_000) return; // clamp
-        if (antiCheatEnabled) {
+        if (flags.isEnabled("anti_cheat_enabled")) {
             String runId = env.payload.runId;
             if (!runIdService.validateAndConsume(runId)) {
                 return; // reject without broadcasting
@@ -105,7 +102,7 @@ public class SnakeRealtimeController {
 
     @MessageMapping("/snake/chat")
     public void chat(@Valid @Payload Envelope<@Valid ChatIn> env) {
-        if (!realtimeEnabled || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
+        if (!flags.isEnabled("realtime_enabled") || env == null || env.user == null || env.user.nickname == null || env.payload == null) return;
         String text = env.payload.text == null ? "" : env.payload.text.trim();
         if (text.isBlank()) return;
         text = profanityFilter.filter(text);
