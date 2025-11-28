@@ -1,4 +1,4 @@
-import type { NextConfig } from "next";
+import type {NextConfig} from "next";
 import path from 'path';
 
 const nextConfig: NextConfig = {
@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
             '@games/memory': path.resolve(__dirname, 'games/memory/src'),
             '@games/breakout': path.resolve(__dirname, 'games/breakout/src'),
             '@games/tetris': path.resolve(__dirname, 'games/tetris/src'),
+          '@games/bubble-pop': path.resolve(__dirname, 'games/bubble-pop/src'),
+          '@games/knitzy': path.resolve(__dirname, 'games/knitzy/src'),
+          '@games/platformer': path.resolve(__dirname, 'games/platformer/src'),
+          '@games/tower-defense': path.resolve(__dirname, 'games/tower-defense/src'),
         };
         return config;
     },
