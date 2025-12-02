@@ -24,7 +24,7 @@ public class FeatureController {
 
     @PostMapping("/admin/features/{flag}/toggle")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> toggle(@PathVariable String flag, @RequestParam boolean enable) {
+    public ResponseEntity<Map<String, Object>> toggle(@PathVariable String flag, @RequestParam(defaultValue = "true") boolean enable) {
         if (!flags.knownFlags().contains(flag)) {
             return ResponseEntity.badRequest().body(Map.of("error", "unknown flag: "+flag));
         }

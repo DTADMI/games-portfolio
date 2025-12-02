@@ -1,23 +1,23 @@
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Play, Github, ExternalLink } from "lucide-react"
-import Image from "next/image"
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ExternalLink, Github, Play } from "lucide-react";
+import Image from "next/image";
 
 interface Game {
-  id: number
-  title: string
-  description: string
-  image: string
-  tags: string[]
-  demoUrl: string
-  codeUrl: string
-  featured?: boolean
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  tags: string[];
+  demoUrl: string;
+  codeUrl: string;
+  featured?: boolean;
 }
 
 interface GameCardProps {
-  game: Game
-  featured?: boolean
+  game: Game;
+  featured?: boolean;
 }
 
 export function GameCard({ game, featured = false }: GameCardProps) {
@@ -40,12 +40,18 @@ export function GameCard({ game, featured = false }: GameCardProps) {
               Play Demo
             </Button>
           </div>
-          {featured && <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground">Featured</Badge>}
+          {featured && (
+            <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground">
+              Featured
+            </Badge>
+          )}
         </div>
       </CardHeader>
 
       <CardContent className="p-6">
-        <h3 className="text-xl font-semibold text-card-foreground mb-2 text-balance">{game.title}</h3>
+        <h3 className="text-xl font-semibold text-card-foreground mb-2 text-balance">
+          {game.title}
+        </h3>
         <p className="text-muted-foreground mb-4 text-pretty">{game.description}</p>
         <div className="flex flex-wrap gap-2">
           {game.tags.map((tag) => (
@@ -71,5 +77,5 @@ export function GameCard({ game, featured = false }: GameCardProps) {
         </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }

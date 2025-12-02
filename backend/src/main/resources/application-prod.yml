@@ -15,6 +15,12 @@ spring:
 # CORS configuration for production
 cors:
   allowed-origins: ${FRONTEND_URL}
-  allowed-methods: GET, POST, PUT, DELETE, OPTIONS
-  allowed-headers: *
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  allowed-headers:
+    - "*"
   allow-credentials: true

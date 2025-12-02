@@ -1,21 +1,51 @@
-// backend/src/test/java/com/games/backend/controller/GameControllerIT.java
+package com.games.backend.controller;
+
+import com.games.backend.model.GameScore;
+import com.games.backend.security.JwtTokenProvider;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.*;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
 @ActiveProfiles("test")
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(JwtTokenProvider.class)
 class GameControllerIT {
 
+  private static final boolean useDocker = Boolean.parseBoolean(System.getenv().getOrDefault("ENABLE_DOCKER_TESTS", "false"));
+
     @Container
-    private static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:15-alpine")
-                    .withDatabaseName("testdb")
-                    .withUsername("test")
-                    .withPassword("test");
+    private static final PostgreSQLContainer<?> postgres = useDocker ?
+      new PostgreSQLContainer<>("postgres:15-alpine")
+        .withDatabaseName("testdb")
+        .withUsername("test")
+        .withPassword("test") : null;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+      if (useDocker && postgres != null) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+      }
     }
 
     @Autowired

@@ -202,3 +202,9 @@ dist/**/*.js.map
 # TypeScript v1 declaration files
 typings/
 !/.idea/
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/

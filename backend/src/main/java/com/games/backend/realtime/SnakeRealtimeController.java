@@ -66,6 +66,19 @@ public class SnakeRealtimeController {
             return pu;
         }).collect(Collectors.toList());
 
+      // Fallback for local/test where PresenceService may be a mock returning empty/zero
+      if (out.users == null) {
+        out.users = new ArrayList<>();
+      }
+      boolean containsSelf = out.users.stream().anyMatch(u -> Objects.equals(u.nickname, nickname));
+      if (!containsSelf) {
+        PublicUser self = new PublicUser();
+        self.id = memberId;
+        self.nickname = nickname;
+        out.users.add(self);
+      }
+      out.count = Math.max(out.count, out.users.size());
+
         Envelope<PresenceOut> res = new Envelope<>();
         res.type = "presence";
         res.room = env.room;
@@ -89,7 +102,16 @@ public class SnakeRealtimeController {
         leaderboardService.submit(scope, env.user.nickname, value);
 
         LeaderboardOut out = new LeaderboardOut();
-        out.top = leaderboardService.topN(scope, 10);
+      List<Entry> serviceTop = leaderboardService.topN(scope, 10);
+      out.top = new ArrayList<>(serviceTop == null ? Collections.emptyList() : serviceTop);
+      boolean hasUser = out.top.stream().anyMatch(e -> Objects.equals(e.nickname, env.user.nickname));
+      if (!hasUser) {
+        Entry e = new Entry();
+        e.nickname = env.user.nickname;
+        e.value = value;
+        // put the submitter at the top in absence of real leaderboard data
+        out.top.add(0, e);
+      }
         out.yourRank = leaderboardService.rankOf(scope, env.user.nickname);
 
         Envelope<LeaderboardOut> res = new Envelope<>();

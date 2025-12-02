@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 // Extremely small MVP for a 10x10 board Block Blast style game.
@@ -16,14 +16,22 @@ type Piece = number[][]; // 1-filled matrix
 const PRESET_PIECES: Piece[] = [
   [[1, 1, 1]],
   [[1], [1], [1]],
-  [[1, 1], [1, 0]],
-  [[1, 1], [0, 1]],
+  [
+    [1, 1],
+    [1, 0],
+  ],
+  [
+    [1, 1],
+    [0, 1],
+  ],
   [[1, 1]],
   [[1]],
 ];
 
 function emptyBoard(): Cell[][] {
-  return Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => 0 as Cell));
+  return Array.from({ length: BOARD_SIZE }, () =>
+    Array.from({ length: BOARD_SIZE }, () => 0 as Cell),
+  );
 }
 
 function canPlace(board: Cell[][], piece: Piece, r: number, c: number): boolean {
@@ -58,7 +66,7 @@ function place(board: Cell[][], piece: Piece, r: number, c: number): Cell[][] {
 
 function clearLines(board: Cell[][]): { board: Cell[][]; cleared: number } {
   let cleared = 0;
-  let next = board.map((row) => row.slice());
+  const next = board.map((row) => row.slice());
 
   // rows
   for (let r = 0; r < BOARD_SIZE; r++) {
@@ -137,15 +145,21 @@ export default function BlockBlastPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Block Blast (MVP)</h1>
         <div className="flex items-center gap-3">
-          <div className="text-sm">Score: <b>{score}</b></div>
-          <Button variant="outline" onClick={reset}>Reset</Button>
+          <div className="text-sm">
+            Score: <b>{score}</b>
+          </div>
+          <Button variant="outline" onClick={reset}>
+            Reset
+          </Button>
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-3">Place pieces on a 10×10 board. Clear full rows or columns for points.</p>
+      <p className="text-sm text-muted-foreground mb-3">
+        Place pieces on a 10×10 board. Clear full rows or columns for points.
+      </p>
 
       <div className="grid grid-cols-10 gap-1 w-max">
-        {board.map((row, r) => (
+        {board.map((row, r) =>
           row.map((cell, c) => (
             <button
               key={`${r}-${c}`}
@@ -153,8 +167,8 @@ export default function BlockBlastPage() {
               className={`h-7 w-7 rounded-sm ${cell ? "bg-primary" : "bg-muted hover:bg-muted/80"}`}
               aria-label={`cell ${r},${c}`}
             />
-          ))
-        ))}
+          )),
+        )}
       </div>
 
       <div className="mt-6">

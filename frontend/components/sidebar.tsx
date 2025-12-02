@@ -1,17 +1,17 @@
-import { Button } from "@/components/ui/button"
-import { Home, Gamepad2, User, Mail, Github, ExternalLink } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { ExternalLink, Gamepad2, Github, Home, Mail, User } from "lucide-react";
 
 const navigation = [
   { name: "Home", href: "#", icon: Home, current: true },
   { name: "Games", href: "#games", icon: Gamepad2, current: false },
   { name: "About", href: "#about", icon: User, current: false },
   { name: "Contact", href: "#contact", icon: Mail, current: false },
-]
+];
 
 const socialLinks = [
   { name: "GitHub", href: "#", icon: Github },
   { name: "Portfolio", href: "#", icon: ExternalLink },
-]
+];
 
 export function Sidebar() {
   return (
@@ -30,7 +30,7 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navigation.map((item) => {
-            const Icon = item.icon
+            const Icon = item.icon;
             return (
               <Button
                 key={item.name}
@@ -43,7 +43,7 @@ export function Sidebar() {
                   {item.name}
                 </a>
               </Button>
-            )
+            );
           })}
         </nav>
 
@@ -51,7 +51,7 @@ export function Sidebar() {
         <div className="px-4 py-6 border-t border-sidebar-border">
           <div className="space-y-2">
             {socialLinks.map((link) => {
-              const Icon = link.icon
+              const Icon = link.icon;
               return (
                 <Button
                   key={link.name}
@@ -65,11 +65,11 @@ export function Sidebar() {
                     {link.name}
                   </a>
                 </Button>
-              )
+              );
             })}
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

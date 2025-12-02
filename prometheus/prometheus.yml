@@ -3,14 +3,14 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'spring'
-    metrics_path: '/actuator/prometheus'
+  - job_name: "spring"
+    metrics_path: "/actuator/prometheus"
     scrape_interval: 5s
     static_configs:
-      - targets: ['host.docker.internal:8080']
+      - targets: [ "host.docker.internal:8080" ]
         labels:
-          application: 'games-backend'
+          application: "games-backend"
 
-  - job_name: 'node'
+  - job_name: "node"
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: [ "node-exporter:9100" ]

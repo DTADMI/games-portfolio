@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import * as nextAuth from "next-auth/react";
 import { UserMenu } from "@/components/user-menu";
@@ -21,7 +21,10 @@ describe("UserMenu", () => {
   });
 
   it("shows Sign out when authenticated", () => {
-    (nextAuth.useSession as any).mockReturnValue({ data: { user: { email: "a@b.c" } }, status: "authenticated" });
+    (nextAuth.useSession as any).mockReturnValue({
+      data: { user: { email: "a@b.c" } },
+      status: "authenticated",
+    });
     render(<UserMenu />);
     expect(screen.getByText(/sign out/i)).toBeInTheDocument();
   });

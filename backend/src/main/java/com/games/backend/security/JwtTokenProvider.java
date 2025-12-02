@@ -2,6 +2,7 @@
 package com.games.backend.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,6 +19,11 @@ public class JwtTokenProvider {
     @Value("${app.jwtExpirationInMs}")
     private int jwtExpirationInMs;
 
+  private byte[] signingKey() {
+    // jjwt 0.11.x expects base64-encoded secret when passing String. Decode explicitly for clarity.
+    return Decoders.BASE64.decode(jwtSecret);
+  }
+
     public String generateToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
         Date now = new Date();
@@ -27,7 +33,7 @@ public class JwtTokenProvider {
                 .setSubject(userPrincipal.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(expiryDate)
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+          .signWith(SignatureAlgorithm.HS512, signingKey())
                 .compact();
     }
 
@@ -37,7 +43,7 @@ public class JwtTokenProvider {
 
     public String getUsernameFromJWT(String token) {
         Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
+          .setSigningKey(signingKey())
                 .parseClaimsJws(token)
                 .getBody();
 
@@ -46,18 +52,20 @@ public class JwtTokenProvider {
 
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
+          Jwts.parser().setSigningKey(signingKey()).parseClaimsJws(authToken);
             return true;
+        } catch (io.jsonwebtoken.io.DecodingException ex) {
+          // token or secret not base64/invalid structure
         } catch (SignatureException ex) {
-            // Log exception
+          // invalid signature
         } catch (MalformedJwtException ex) {
-            // Log exception
+          // malformed token
         } catch (ExpiredJwtException ex) {
-            // Log exception
+          // expired token
         } catch (UnsupportedJwtException ex) {
-            // Log exception
+          // unsupported token
         } catch (IllegalArgumentException ex) {
-            // Log exception
+          // empty token
         }
         return false;
     }

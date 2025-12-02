@@ -1,10 +1,9 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import {SoundProvider} from '@games/shared/contexts/SoundContext';
+import dynamic from "next/dynamic";
 
 const TowerDefenseGame = dynamic(
-  () => import('@games/tower-defense/components/TowerDefenseGame').then((m) => m.TowerDefenseGame),
+  () => import("@games/tower-defense").then((m) => m.TowerDefenseGame),
   {
     ssr: false,
     loading: () => (
@@ -12,13 +11,9 @@ const TowerDefenseGame = dynamic(
         <div className="text-xl">Loading game...</div>
       </div>
     ),
-  }
+  },
 );
 
 export default function TowerDefensePage() {
-  return (
-    <SoundProvider>
-      <TowerDefenseGame/>
-    </SoundProvider>
-  );
+  return <TowerDefenseGame />;
 }

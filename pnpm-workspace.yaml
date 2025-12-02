@@ -1,4 +1,4 @@
 packages:
-  - 'frontend'
-  - 'games/*'
-  - 'libs/*'
+  - "frontend"
+  - "games/*"
+  - "libs/*"

@@ -1,10 +1,12 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "es5",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -13,29 +15,43 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "types": ["node", "vitest", "vitest/globals", "@testing-library/jest-dom"],
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@testing-library"
-    ],
+    "baseUrl": ".",
+    "typeRoots": ["./node_modules/@types", "./types"],
+    "paths": {
+      "@/*": ["./*"],
+      "@components/*": ["./components/*"],
+      "@lib/*": ["./lib/*"],
+      "@styles/*": ["./styles/*"],
+      "@games/*": ["../../games/*/src", "../../games/*"],
+      "@/utils/*": ["./utils/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/contexts/*": ["./contexts/*"],
+      "@games/snake": ["../../games/snake/src"],
+      "@games/snake/*": ["../../games/snake/src/*"],
+      "@games/memory": ["../../games/memory/src"],
+      "@games/memory/*": ["../../games/memory/src/*"],
+      "@games/breakout": ["../../games/breakout/src"],
+      "@games/breakout/*": ["../../games/breakout/src/*"],
+      "@games/tetris": ["../../games/tetris/src"],
+      "@games/tetris/*": ["../../games/tetris/src/*"],
+      "@games/bubble-pop": ["../../games/bubble-pop/src"],
+      "@games/bubble-pop/*": ["../../games/bubble-pop/src/*"],
+      "@games/knitzy": ["../../games/knitzy/src"],
+      "@games/knitzy/*": ["../../games/knitzy/src/*"],
+      "@games/platformer": ["../../games/platformer/src"],
+      "@games/platformer/*": ["../../games/platformer/src/*"],
+      "@games/tower-defense": ["../../games/tower-defense/src"],
+      "@games/tower-defense/*": ["../../games/tower-defense/src/*"],
+      "@games/shared": ["../../libs/shared/src"],
+      "@games/shared/*": ["../../libs/shared/src/*"],
+      "@/types/*": ["./types/*", "../games/snake/src/types/*"]
+    },
     "plugins": [
       {
         "name": "next"
       }
-    ],
-    "paths": {
-      "@/*": ["./*"]
-    }
+    ]
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
-  ],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

@@ -1,5 +1,7 @@
 // games/snake/src/types/game.ts
-export type GameMode = 'classic' | 'obstacles' | 'speed' | 'portal';
+export type GameMode = "classic" | "obstacles" | "speed" | "portal";
+
+export type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT";
 
 export interface GameConfig {
   mode: GameMode;
@@ -23,7 +25,7 @@ export interface Portal {
 export interface GameState {
   snake: Position[];
   food: Position;
-  direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+  direction: Direction;
   gameOver: boolean;
   score: number;
   highScore: number;

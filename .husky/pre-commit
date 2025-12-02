@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+set -e
 
 # Run lint-staged with Bun
-bunx lint-staged
+bunx lint-staged --quiet

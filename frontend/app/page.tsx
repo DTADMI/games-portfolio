@@ -1,10 +1,10 @@
-import { GameCard } from "@/components/game-card"
-import { Header } from "@/components/header"
-import { Sidebar } from "@/components/sidebar"
-import { Button } from "@/components/ui/button"
-import { Github, ExternalLink } from "lucide-react"
+import { GameCard } from "@/components/game-card";
+import { Header } from "@/components/header";
+import { Sidebar } from "@/components/sidebar";
+import { Button } from "@/components/ui/button";
+import { ExternalLink, Github } from "lucide-react";
 
-const REPO = process.env.NEXT_PUBLIC_REPO_URL || ''
+const REPO = process.env.NEXT_PUBLIC_REPO_URL || "";
 const featuredGames = [
   {
     id: 1,
@@ -66,11 +66,11 @@ const featuredGames = [
     codeUrl: "#",
     featured: false,
   },
-]
+];
 
 export default function HomePage() {
-  const featuredProjects = featuredGames.filter((game) => game.featured)
-  const allProjects = featuredGames
+  const featuredProjects = featuredGames.filter((game) => game.featured);
+  const allProjects = featuredGames;
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,9 +88,9 @@ export default function HomePage() {
                   JavaScript Games & Interactive Projects
                 </h1>
                 <p className="text-lg text-muted-foreground mb-6 text-pretty">
-                  Welcome to my collection of interactive games and projects built with JavaScript. Each project
-                  showcases different aspects of game development, from classic arcade games to modern interactive
-                  experiences.
+                  Welcome to my collection of interactive games and projects built with JavaScript.
+                  Each project showcases different aspects of game development, from classic arcade
+                  games to modern interactive experiences.
                 </p>
                 <div className="flex gap-4">
                   <Button size="lg" className="gap-2">
@@ -128,5 +128,5 @@ export default function HomePage() {
         </main>
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,21 @@
-// backend/src/test/java/com/games/backend/service/GameServiceTest.java
+package com.games.backend.service;
+
+import com.games.backend.model.GameScore;
+import com.games.backend.model.User;
+import com.games.backend.repository.GameScoreRepository;
+import com.games.backend.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 @ExtendWith(MockitoExtension.class)
 class GameServiceTest {
 
@@ -28,11 +45,10 @@ class GameServiceTest {
         savedScore.setGameType(gameType);
         savedScore.setScore(score);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
         when(gameScoreRepository.save(any(GameScore.class))).thenReturn(savedScore);
 
         // When
-        GameScore result = gameService.saveScore(username, gameType, score, null);
+      GameScore result = gameService.saveScore(user, gameType, score);
 
         // Then
         assertNotNull(result);

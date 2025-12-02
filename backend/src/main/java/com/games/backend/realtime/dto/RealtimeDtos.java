@@ -1,6 +1,7 @@
 package com.games.backend.realtime.dto;
 
 import jakarta.validation.constraints.*;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -94,4 +95,27 @@ public class RealtimeDtos {
         public String nickname;
         public String text;
     }
+
+  // Generic move DTOs for board games (Chess/Checkers)
+  public static class MoveIn {
+    // Algebraic coordinates like e2e4 for chess, or simple from/to indexes
+    @Size(max = 8)
+    public String from;
+    @Size(max = 8)
+    public String to;
+    // Optional promotion piece for chess: q/r/b/n
+    @Size(max = 1)
+    public String promo;
+    // Optional raw notation provided by client (SAN, PDN, etc.)
+    @Size(max = 32)
+    public String notation;
+  }
+
+  public static class MoveOut {
+    public String from;
+    public String to;
+    public String promo;
+    public String notation;
+    public String side; // which player moved (WHITE/BLACK or RED/BLACK)
+  }
 }

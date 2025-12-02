@@ -1,16 +1,24 @@
 import { render, screen } from "@testing-library/react";
+import { vi } from "vitest";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/header";
 
+// Mock next-auth to avoid requiring a real <SessionProvider /> in this unit test
+vi.mock("next-auth/react", async () => {
+  const actual: any = await vi.importActual("next-auth/react");
+  return {
+    ...actual,
+    useSession: vi.fn().mockReturnValue({ data: null, status: "unauthenticated" }),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  };
+});
+
 function renderWithProviders(ui: React.ReactNode) {
   return render(
-    <html>
-      <body>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {ui}
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      {ui}
+    </ThemeProvider>,
   );
 }
 

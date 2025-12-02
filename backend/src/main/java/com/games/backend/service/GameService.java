@@ -4,7 +4,6 @@ package com.games.backend.service;
 import com.games.backend.model.GameScore;
 import com.games.backend.model.User;
 import com.games.backend.repository.GameScoreRepository;
-import org.ff4j.FF4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
@@ -13,7 +12,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GameService {
@@ -21,11 +23,9 @@ public class GameService {
     private static final int USER_SCORES_LIMIT = 5;
 
     private final GameScoreRepository gameScoreRepository;
-    private final FF4j ff4j;
 
-    public GameService(GameScoreRepository gameScoreRepository, FF4j ff4j) {
+  public GameService(GameScoreRepository gameScoreRepository) {
         this.gameScoreRepository = gameScoreRepository;
-        this.ff4j = ff4j;
     }
 
     @Transactional
@@ -44,11 +44,31 @@ public class GameService {
         return gameScoreRepository.findTopScoresByGameType(gameType, pageable);
     }
 
+  // Legacy aggregate endpoint support
+  @Cacheable(value = "leaderboard", key = "'ALL'")
+  public Map<String, List<GameScore>> getLeaderboard() {
+    Map<String, List<GameScore>> map = new LinkedHashMap<>();
+    for (String game : List.of("snake", "memory", "breakout", "tetris")) {
+      map.put(game, getLeaderboard(game));
+    }
+    return map;
+  }
+
     @Cacheable(value = "userScores", key = "#userId + '_' + #gameType")
     public List<GameScore> getUserScores(Long userId, String gameType) {
         Pageable pageable = PageRequest.of(0, USER_SCORES_LIMIT, Sort.by("score").descending().and(Sort.by("createdAt").ascending()));
         return gameScoreRepository.findUserScores(userId, gameType, pageable);
     }
+
+  // Legacy aggregate endpoint support
+  @Cacheable(value = "userScores", key = "#userId + '_ALL'")
+  public Map<String, List<GameScore>> getUserScores(Long userId) {
+    Map<String, List<GameScore>> map = new LinkedHashMap<>();
+    for (String game : List.of("snake", "memory", "breakout", "tetris")) {
+      map.put(game, getUserScores(userId, game));
+    }
+    return map;
+  }
 
     @Scheduled(fixedRate = 300000) // Every 5 minutes
     @CacheEvict(value = {"leaderboard", "userScores"}, allEntries = true)
@@ -57,6 +77,7 @@ public class GameService {
     }
 
     public boolean isFeatureEnabled(String featureName) {
-        return ff4j.check(featureName);
+      // FF4J removed; default to true for now (feature flags can be re-added later)
+      return true;
     }
 }

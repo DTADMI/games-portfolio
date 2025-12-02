@@ -1,5 +1,18 @@
-// Deprecated: Bucket4j interceptor removed in favor of Resilience4j-based RateLimitFilter.
-// This file intentionally left without a class to avoid compilation of unused code.
 package com.games.backend.interceptor;
 
-// No-op. See com.games.backend.security.RateLimitFilter for the active implementation.
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+/**
+ * Minimal no-op interceptor used by {@link com.games.backend.config.WebMvcConfig}.
+ * Real rate limiting is handled elsewhere (e.g., filters/Resilience4j).
+ */
+@Component
+public class RateLimitInterceptor implements HandlerInterceptor {
+  @Override
+  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    return true; // allow all requests
+  }
+}

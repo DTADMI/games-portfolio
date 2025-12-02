@@ -3,6 +3,8 @@ import "./globals.css";
 import React from "react";
 import { AppSessionProvider } from "@/contexts/session-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import SoundRootProvider from "@/components/SoundRootProvider";
+import SoundControls from "@/components/SoundControls";
 
 export const metadata: Metadata = {
   title: "React Games Portfolio",
@@ -14,7 +16,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <AppSessionProvider>{children}</AppSessionProvider>
+          <SoundRootProvider>
+            <AppSessionProvider>
+              {/* Global sound controls UI */}
+              <SoundControls />
+              {children}
+            </AppSessionProvider>
+          </SoundRootProvider>
         </ThemeProvider>
       </body>
     </html>

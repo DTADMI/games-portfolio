@@ -6,45 +6,59 @@
   "workspaces": [
     "frontend",
     "games/*",
-    "libs/*",
-    "libs/shared"
+    "libs/*"
   ],
   "scripts": {
-    "dev": "bun run dev:services",
-    "dev:services": "run-p dev:backend dev:frontend",
-    "dev:backend": "bun --cwd backend run dev || (cd backend && mvn spring-boot:run)",
-    "dev:frontend": "bun --cwd frontend run dev",
-    "build": "run-s build:backend build:frontend",
-    "build:frontend": "bun --cwd frontend run build",
+    "dev": "bun --cwd frontend dev",
+    "dev:frontend": "bun --cwd frontend dev",
+    "dev:backend": "cd backend && mvn spring-boot:run",
+    "dev:all": "concurrently \"bun dev:frontend\" \"bun dev:backend\"",
+    "build": "bun build:frontend && bun build:backend",
+    "build:frontend": "bun --cwd frontend build",
     "build:backend": "cd backend && mvn -q -DskipTests package",
-    "lint": "run-p lint:*",
-    "lint:root": "eslint .",
-    "format": "prettier --write .",
-    "test": "run-p test:* || true",
-    "test:frontend": "bun --cwd frontend run test || echo 'frontend tests pending'",
-    "test:backend": "cd backend && mvn -q -DskipTests=false test",
+    "start": "bun --cwd frontend start",
+    "lint": "bun --cwd frontend lint",
+    "format": "bun --cwd frontend format",
+    "test": "bun --cwd frontend test",
+    "test:watch": "bun --cwd frontend test:watch",
+    "test:coverage": "bun --cwd frontend test:coverage",
+    "test:e2e": "bun --cwd frontend test:e2e",
     "prepare": "husky install"
   },
+  "dependencies": {
+    "@games/shared": "workspace:*"
+  },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
-    "concurrently": "^8.2.0",
-    "eslint": "^9.14.0",
-    "eslint-config-next": "^16.0.5",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "autoprefixer": "^10.4.22",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-prettier": "^5.1.3",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "husky": "^9.1.6",
-    "lint-staged": "^15.2.10",
-    "npm-run-all": "^4.1.5",
-    "prettier": "^3.3.3"
+    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "eslint-plugin-tailwindcss": "^3.15.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "postcss": "^8.5.6",
+    "prettier": "^3.3.3",
+    "typescript": "^5.4.5"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+      "eslint --fix --max-warnings=0 --no-warn-ignored --ignore-pattern '**/backend/**/*' --ignore-pattern '**/node_modules/**/*' --cache"
     ],
-    "**/*.{json,md,css}": [
-      "prettier --write"
+    "**/*.{js,jsx,ts,tsx,json,md,css}": [
+      "prettier --write --ignore-unknown"
     ]
   }
 }

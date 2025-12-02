@@ -1,9 +1,9 @@
-import TetrisGame from '@/components/TetrisGame';
+import TetrisGame from "@/components/TetrisGame";
 
 export default function TetrisPage() {
-    return (
-        <main className="min-h-screen bg-gray-100">
-            <TetrisGame />
-        </main>
-    );
+  return (
+    <main className="min-h-screen bg-gray-100">
+      <TetrisGame />
+    </main>
+  );
 }

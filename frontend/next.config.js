@@ -2,20 +2,32 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "",
+        pathname: "/**",
+      },
+    ],
   },
-  publicRuntimeConfig: {
-    // Will be available on both server and client
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api",
   },
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'}/:path*`,
+        source: "/api/:path*",
+        destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"}/:path*`,
       },
-    ]
+    ];
   },
-}
+  // Optional: Uncomment if you're using Turbopack
+  // experimental: {
+  //   turbo: {
+  //     root: __dirname,
+  //   },
+  // },
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

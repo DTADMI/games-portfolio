@@ -6,7 +6,7 @@ export interface Position {
 export interface GameState {
   snake: Position[];
   food: Position;
-  direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+  direction: "UP" | "DOWN" | "LEFT" | "RIGHT";
   gameOver: boolean;
   score: number;
   highScore: number;

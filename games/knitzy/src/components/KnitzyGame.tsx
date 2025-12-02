@@ -1,19 +1,19 @@
 // games/knitzy/src/components/KnitzyGame.tsx
-'use client';
+"use client";
 
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {soundManager} from '@games/shared';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { soundManager } from "@games/shared";
 
 // Board settings
 const SIZE = 12; // 12x12
 const CELL = 32;
-const COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6'];
+const COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
 
 type Grid = number[][]; // -1 empty (work), else color index
 
 function makeTarget(size = SIZE): Grid {
   // Simple mirrored pattern with 3–4 colors
-  const g: Grid = Array.from({length: size}, () => Array(size).fill(0));
+  const g: Grid = Array.from({ length: size }, () => Array(size).fill(0));
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < Math.ceil(size / 2); x++) {
       const c = Math.floor(Math.random() * COLORS.length);
@@ -25,7 +25,7 @@ function makeTarget(size = SIZE): Grid {
 }
 
 function emptyGrid(size = SIZE): Grid {
-  return Array.from({length: size}, () => Array(size).fill(-1));
+  return Array.from({ length: size }, () => Array(size).fill(-1));
 }
 
 function progress(target: Grid, work: Grid): number {
@@ -33,14 +33,16 @@ function progress(target: Grid, work: Grid): number {
   let total = target.length * target[0].length;
   for (let y = 0; y < target.length; y++) {
     for (let x = 0; x < target[0].length; x++) {
-      if (work[y][x] >= 0 && work[y][x] === target[y][x]) ok++;
+      if (work[y][x] >= 0 && work[y][x] === target[y][x]) {
+        ok++;
+      }
     }
   }
   return Math.round((ok / total) * 100);
 }
 
 function copy(g: Grid): Grid {
-  return g.map(r => r.slice());
+  return g.map((r) => r.slice());
 }
 
 export const KnitzyGame: React.FC = () => {
@@ -55,18 +57,23 @@ export const KnitzyGame: React.FC = () => {
 
   useEffect(() => {
     try {
-      const ms = parseInt(localStorage.getItem('knitzy:bestMs') || '0', 10);
-      if (!isNaN(ms) && ms > 0) setBestMs(ms);
-    } catch {
-    }
+      const ms = parseInt(localStorage.getItem("knitzy:bestMs") || "0", 10);
+      if (!isNaN(ms) && ms > 0) {
+        setBestMs(ms);
+      }
+    } catch {}
   }, []);
 
   // draw both target (left) and work (right)
   const draw = useCallback(() => {
     const c = canvasRef.current;
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    if (!ctx) return;
+    if (!c) {
+      return;
+    }
+    const ctx = c.getContext("2d");
+    if (!ctx) {
+      return;
+    }
     const dpr = Math.max(1, window.devicePixelRatio || 1);
 
     const gap = 20;
@@ -83,12 +90,12 @@ export const KnitzyGame: React.FC = () => {
     }
 
     // background
-    ctx.fillStyle = '#0b1020';
+    ctx.fillStyle = "#0b1020";
     ctx.fillRect(0, 0, w, h);
 
     const drawBoard = (gx: number, gy: number, grid: Grid, showEmpty: boolean) => {
       // panel
-      ctx.fillStyle = '#111827';
+      ctx.fillStyle = "#111827";
       ctx.fillRect(gx - gap / 2, gy - gap / 2, boardPx + gap, boardPx + gap);
 
       for (let y = 0; y < SIZE; y++) {
@@ -98,21 +105,21 @@ export const KnitzyGame: React.FC = () => {
           const py = gy + y * CELL;
 
           // cell bg
-          ctx.fillStyle = '#0f172a';
+          ctx.fillStyle = "#0f172a";
           ctx.fillRect(px, py, CELL, CELL);
 
           if (val >= 0) {
             ctx.fillStyle = COLORS[val % COLORS.length];
             ctx.fillRect(px + 2, py + 2, CELL - 4, CELL - 4);
           } else if (showEmpty) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.strokeStyle = "rgba(255,255,255,0.06)";
             ctx.strokeRect(px + 2, py + 2, CELL - 4, CELL - 4);
           }
         }
       }
 
       // grid lines
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
       for (let x = 0; x <= SIZE; x++) {
         ctx.beginPath();
         ctx.moveTo(gx + x * CELL, gy);
@@ -127,26 +134,29 @@ export const KnitzyGame: React.FC = () => {
       }
     };
 
-    const leftX = gap, topY = gap + 40;
+    const leftX = gap,
+      topY = gap + 40;
     drawBoard(leftX, topY, target, false);
     drawBoard(leftX + boardPx + gap, topY, work, true);
 
     // headers
-    ctx.fillStyle = 'white';
-    ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto';
-    ctx.fillText('Target', leftX, gap + 24);
-    ctx.fillText('Your Work', leftX + boardPx + gap, gap + 24);
+    ctx.fillStyle = "white";
+    ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto";
+    ctx.fillText("Target", leftX, gap + 24);
+    ctx.fillText("Your Work", leftX + boardPx + gap, gap + 24);
 
     // HUD
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '14px system-ui, -apple-system, Segoe UI, Roboto';
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
     ctx.fillText(`Progress: ${pct}%`, gap, boardPx + gap * 2 + 30);
-    if (bestMs) ctx.fillText(`Best: ${(bestMs / 1000).toFixed(1)}s`, gap + 150, boardPx + gap * 2 + 30);
+    if (bestMs) {
+      ctx.fillText(`Best: ${(bestMs / 1000).toFixed(1)}s`, gap + 150, boardPx + gap * 2 + 30);
+    }
 
     // palette
     const paletteY = gap;
     let palX = leftX + boardPx + gap;
-    ctx.fillText('Palette', palX, paletteY - 8);
+    ctx.fillText("Palette", palX, paletteY - 8);
     for (let i = 0; i < COLORS.length; i++) {
       const wCell = 24;
       const hCell = 24;
@@ -155,7 +165,7 @@ export const KnitzyGame: React.FC = () => {
       const y = paletteY + 4;
       ctx.fillStyle = COLORS[i];
       ctx.fillRect(x, y, wCell, hCell);
-      ctx.strokeStyle = i === color ? 'white' : 'rgba(255,255,255,0.35)';
+      ctx.strokeStyle = i === color ? "white" : "rgba(255,255,255,0.35)";
       ctx.lineWidth = i === color ? 2 : 1;
       ctx.strokeRect(x, y, wCell, hCell);
     }
@@ -168,7 +178,9 @@ export const KnitzyGame: React.FC = () => {
   // mouse painting on the WORK board
   const handlePointer = (clientX: number, clientY: number, isClick = false) => {
     const c = canvasRef.current;
-    if (!c) return;
+    if (!c) {
+      return;
+    }
     const rect = c.getBoundingClientRect();
     const boardPx = SIZE * CELL;
     const gap = 20;
@@ -177,16 +189,20 @@ export const KnitzyGame: React.FC = () => {
     const workX = leftX + boardPx + gap;
     const workY = topY;
 
-    const x = Math.floor(((clientX - rect.left) - workX) / CELL);
-    const y = Math.floor(((clientY - rect.top) - workY) / CELL);
-    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return;
+    const x = Math.floor((clientX - rect.left - workX) / CELL);
+    const y = Math.floor((clientY - rect.top - workY) / CELL);
+    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) {
+      return;
+    }
 
     setWork((prev) => {
       const next = copy(prev);
       next[y][x] = color;
       return next;
     });
-    if (isClick) soundManager.playSound('click', 0.5);
+    if (isClick) {
+      soundManager.playSound("click", 0.5);
+    }
   };
 
   const onMouseDown: React.MouseEventHandler<HTMLCanvasElement> = (e) => {
@@ -194,7 +210,9 @@ export const KnitzyGame: React.FC = () => {
     handlePointer(e.clientX, e.clientY, true);
   };
   const onMouseMove: React.MouseEventHandler<HTMLCanvasElement> = (e) => {
-    if (!mouseDown) return;
+    if (!mouseDown) {
+      return;
+    }
     handlePointer(e.clientX, e.clientY, false);
   };
   const onMouseUp = () => setMouseDown(false);
@@ -207,14 +225,13 @@ export const KnitzyGame: React.FC = () => {
     if (p >= 100) {
       const ms = Date.now() - startTs;
       try {
-        const best = parseInt(localStorage.getItem('knitzy:bestMs') || '0', 10);
+        const best = parseInt(localStorage.getItem("knitzy:bestMs") || "0", 10);
         if (isNaN(best) || best === 0 || ms < best) {
-          localStorage.setItem('knitzy:bestMs', String(ms));
+          localStorage.setItem("knitzy:bestMs", String(ms));
           setBestMs(ms);
         }
-      } catch {
-      }
-      soundManager.playSound('levelComplete', 0.8);
+      } catch {}
+      soundManager.playSound("levelComplete", 0.8);
     }
   }, [target, work, startTs]);
 
@@ -233,8 +250,8 @@ export const KnitzyGame: React.FC = () => {
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
         className="rounded-lg shadow-lg border border-gray-700"
-        width={(SIZE * CELL) * 2 + 60}
-        height={(SIZE * CELL) + 120}
+        width={SIZE * CELL * 2 + 60}
+        height={SIZE * CELL + 120}
         aria-label={`Knitzy. Progress ${pct} percent.`}
       />
       <div className="mt-3 flex items-center gap-2">
@@ -243,16 +260,21 @@ export const KnitzyGame: React.FC = () => {
           <button
             key={i}
             onClick={() => setColor(i)}
-            className={`w-6 h-6 rounded ${i === color ? 'ring-2 ring-white' : 'ring-1 ring-gray-500'}`}
-            style={{backgroundColor: c}}
+            className={`w-6 h-6 rounded ${i === color ? "ring-2 ring-white" : "ring-1 ring-gray-500"}`}
+            style={{ backgroundColor: c }}
             aria-label={`Select color ${i + 1}`}
           />
         ))}
-        <button onClick={reset} className="ml-4 px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700">New
-          Pattern
+        <button
+          onClick={reset}
+          className="ml-4 px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+        >
+          New Pattern
         </button>
       </div>
-      <div aria-live="polite" className="sr-only">Progress {pct} percent.</div>
+      <div aria-live="polite" className="sr-only">
+        Progress {pct} percent.
+      </div>
     </div>
   );
 };

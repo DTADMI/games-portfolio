@@ -1,9 +1,15 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
+  /* Default font variables (fallbacks) to silence analyzer when next/font isn't loaded */
+  --font-geist-sans:
+    ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  --font-geist-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
   /* Updated color tokens to match the emerald-focused design brief */
   --background: oklch(1 0 0);
   --foreground: oklch(0.35 0 0);
