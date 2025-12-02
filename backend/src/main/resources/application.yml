@@ -42,6 +42,16 @@ features:
   realtime_enabled: true
   chess_enabled: true
   checkers_enabled: true
+  payments:
+    stripe_enabled: false
+  cache:
+    redis_enabled: false
+  kv:
+    redis_enabled: false
+  db:
+    external_enabled: true
+  mail:
+    provider: smtp
 
 # CORS Configuration
 cors:
