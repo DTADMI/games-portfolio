@@ -1,5 +1,5 @@
 // libs/shared/src/components/GameContainer.tsx
-import React, { ReactNode } from "react";
+import React, { type ReactElement, ReactNode } from "react";
 import { ErrorBoundary } from "../lib/ErrorBoundary";
 
 export interface GameContainerProps {
@@ -15,7 +15,7 @@ function GameContainer({
   title,
   description,
   className = "",
-}: GameContainerProps): JSX.Element {
+}: GameContainerProps): ReactElement {
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${className}`}>
       <div className="container mx-auto px-4 py-8">
