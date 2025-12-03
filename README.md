@@ -185,7 +185,10 @@ Also ensure your GitHub Actions deploy service account (the one whose JSON key i
 
 ### Cloud Run deployment with Cloud SQL connector and secrets
 
-The CI workflow already deploys with:
+The CI workflow deploys the backend to Cloud Run using the Cloud SQL connector and Secret Manager for the database
+credentials. No sidecar proxy is required because the backend uses the Cloud SQL PostgreSQL Socket Factory dependency.
+
+It sets at least the following:
 
 ```
 --set-env-vars SPRING_PROFILES_ACTIVE=prod \
@@ -193,12 +196,9 @@ The CI workflow already deploys with:
 --set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
 ```
 
-This attaches the Cloud SQL connector to the service and injects the DB configuration from Secret Manager. No additional
-proxy is required. The backend includes the Cloud SQL PostgreSQL Socket Factory dependency.
+### Manual deploy example (backend → Cloud Run)
 
-### Manual deploy example
-
-If you want to deploy manually using the image built in Artifact Registry:
+If you want to deploy manually using the image in Artifact Registry and the current production shape of the service:
 
 ```bash
 PROJECT=games-portal-479600
@@ -211,14 +211,32 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev"
 docker build -t "$IMAGE" -f backend/Dockerfile .
 docker push "$IMAGE"
 
-# Deploy to Cloud Run
+# Deploy to Cloud Run (includes DB secrets, Firebase creds, and FRONTEND_URL)
+FRONTEND_URL="https://<your-frontend-domain>"
+
 gcloud run deploy "$SERVICE" \
+  --project="$PROJECT" \
   --region="$REGION" \
   --image="$IMAGE" \
   --allow-unauthenticated \
-  --set-env-vars SPRING_PROFILES_ACTIVE=prod \
+  --port=8080 \
   --add-cloudsql-instances "games-portal-479600:northamerica-northeast1:games-postgresql-instance" \
-  --set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
+  --set-env-vars SPRING_PROFILES_ACTIVE=prod,FRONTEND_URL="$FRONTEND_URL" \
+  --set-secrets "\
+SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,\
+SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,\
+SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest,\
+NEXT_FIREBASE_CREDS_TYPE=NEXT_FIREBASE_CREDS_TYPE:latest,\
+NEXT_FIREBASE_CREDS_PROJECT_ID=NEXT_FIREBASE_CREDS_PROJECT_ID:latest,\
+NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID=NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID:latest,\
+NEXT_FIREBASE_CREDS_PRIVATE_KEY=NEXT_FIREBASE_CREDS_PRIVATE_KEY:latest,\
+NEXT_FIREBASE_CREDS_CLIENT_EMAIL=NEXT_FIREBASE_CREDS_CLIENT_EMAIL:latest,\
+NEXT_FIREBASE_CREDS_CLIENT_ID=NEXT_FIREBASE_CREDS_CLIENT_ID:latest,\
+NEXT_FIREBASE_CREDS_AUTH_URI=NEXT_FIREBASE_CREDS_AUTH_URI:latest,\
+NEXT_FIREBASE_CREDS_TOKEN_URI=NEXT_FIREBASE_CREDS_TOKEN_URI:latest,\
+NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL=NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL:latest,\
+NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL=NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL:latest,\
+NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN=NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN:latest"
 ```
 
 Note: If you prefer a direct TCP connection via public IP without the Cloud SQL socket factory, you can also use a
@@ -274,7 +292,24 @@ gcloud run deploy games-backend \
   --region=$REGION \
   --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA} \
   --allow-unauthenticated \
-  --set-env-vars SPRING_PROFILES_ACTIVE=prod
+  --port=8080 \
+  --set-env-vars SPRING_PROFILES_ACTIVE=prod \
+  --add-cloudsql-instances "${PROJECT}:${REGION}:games-postgresql-instance" \
+  --set-secrets "\
+SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,\
+SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,\
+SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest,\
+NEXT_FIREBASE_CREDS_TYPE=NEXT_FIREBASE_CREDS_TYPE:latest,\
+NEXT_FIREBASE_CREDS_PROJECT_ID=NEXT_FIREBASE_CREDS_PROJECT_ID:latest,\
+NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID=NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID:latest,\
+NEXT_FIREBASE_CREDS_PRIVATE_KEY=NEXT_FIREBASE_CREDS_PRIVATE_KEY:latest,\
+NEXT_FIREBASE_CREDS_CLIENT_EMAIL=NEXT_FIREBASE_CREDS_CLIENT_EMAIL:latest,\
+NEXT_FIREBASE_CREDS_CLIENT_ID=NEXT_FIREBASE_CREDS_CLIENT_ID:latest,\
+NEXT_FIREBASE_CREDS_AUTH_URI=NEXT_FIREBASE_CREDS_AUTH_URI:latest,\
+NEXT_FIREBASE_CREDS_TOKEN_URI=NEXT_FIREBASE_CREDS_TOKEN_URI:latest,\
+NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL=NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL:latest,\
+NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL=NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL:latest,\
+NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN=NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN:latest"
 
 # Frontend (SSR)
 gcloud run deploy games-frontend \
@@ -285,6 +320,68 @@ gcloud run deploy games-frontend \
 ```
 
 Optional: put Cloud CDN in front of the frontend service via HTTPS Load Balancer to cache static assets.
+
+### Required Firebase credential secrets
+
+The backend reads Firebase Admin credentials from individual Secret Manager entries (mapped via `--set-secrets`). Create
+them once, then update versions as needed:
+
+```bash
+gcloud secrets create NEXT_FIREBASE_CREDS_TYPE --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_PROJECT_ID --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_PRIVATE_KEY --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_CLIENT_EMAIL --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_CLIENT_ID --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_AUTH_URI --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_TOKEN_URI --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL --replication-policy=automatic
+gcloud secrets create NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN --replication-policy=automatic
+
+# Add versions with appropriate values from your Firebase service account JSON
+echo -n "service_account" | gcloud secrets versions add NEXT_FIREBASE_CREDS_TYPE --data-file=-
+echo -n "<project-id>" | gcloud secrets versions add NEXT_FIREBASE_CREDS_PROJECT_ID --data-file=-
+echo -n "<private_key_id>" | gcloud secrets versions add NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID --data-file=-
+echo -n "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n" | gcloud secrets versions add NEXT_FIREBASE_CREDS_PRIVATE_KEY --data-file=-
+echo -n "<client_email>@<project-id>.iam.gserviceaccount.com" | gcloud secrets versions add NEXT_FIREBASE_CREDS_CLIENT_EMAIL --data-file=-
+echo -n "<client_id>" | gcloud secrets versions add NEXT_FIREBASE_CREDS_CLIENT_ID --data-file=-
+echo -n "https://accounts.google.com/o/oauth2/auth" | gcloud secrets versions add NEXT_FIREBASE_CREDS_AUTH_URI --data-file=-
+echo -n "https://oauth2.googleapis.com/token" | gcloud secrets versions add NEXT_FIREBASE_CREDS_TOKEN_URI --data-file=-
+echo -n "https://www.googleapis.com/oauth2/v1/certs" | gcloud secrets versions add NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL --data-file=-
+echo -n "https://www.googleapis.com/robot/v1/metadata/x509/<sa_name>@<project-id>.iam.gserviceaccount.com" | gcloud secrets versions add NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL --data-file=-
+echo -n "googleapis.com" | gcloud secrets versions add NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN --data-file=-
+```
+
+Ensure the Cloud Run runtime service account and CI deploy service account have `roles/secretmanager.secretAccessor`.
+
+### Logging in production
+
+The backend attempts to ship logs to Logstash only when explicitly enabled. To keep prod quiet by default, the
+`logback-spring.xml` prod profile reads `LOGSTASH_ENABLED`:
+
+```bash
+# default (no Logstash over TCP)
+# to enable later:
+gcloud run deploy "$SERVICE" \
+  --region="$REGION" \
+  --image="$IMAGE" \
+  --allow-unauthenticated \
+  --set-env-vars SPRING_PROFILES_ACTIVE=prod,LOGSTASH_ENABLED=true,LOGSTASH_HOST=<host>,LOGSTASH_PORT=5000
+```
+
+If `LOGSTASH_ENABLED` is not set to `true`, only console logging is active in Cloud Run.
+
+### Verifying the deployed backend
+
+After a successful deploy, the service root `/` is protected by Spring Security and will return `401 Unauthorized`.
+Use the public health-like endpoint and actuator health check:
+
+```bash
+SERVICE_URL="https://<games-backend-xxxxxx-<region>.run.app>"
+curl -sS "$SERVICE_URL/healthz"
+curl -sS "$SERVICE_URL/actuator/health"
+```
 
 ### GitHub Actions CI/CD
 
