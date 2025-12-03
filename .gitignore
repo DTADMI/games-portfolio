@@ -94,7 +94,6 @@ web_modules/
 .yarn-integrity
 
 # dotenv environment variable files
-.env
 .env.development.local
 .env.test.local
 .env.production.local
@@ -110,7 +109,6 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
 
 # Gatsby files
 .cache/
@@ -177,11 +175,9 @@ yarn-error.log
 *.sublime-workspace
 
 # Visual Studio Code
-.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
-!.vscode/extensions.json
 .history/*
 
 
@@ -189,7 +185,6 @@ yarn-error.log
 /build
 
 # System files
-.DS_Store
 Thumbs.db
 
 
@@ -210,3 +205,7 @@ target/
 !**/src/test/**/target/
 
 replacements.txt
+/cert.pem
+/games-portal-479600-b7896ad157fb.json
+/gha-key.json
+/server-ca.pem

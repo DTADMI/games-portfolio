@@ -1,5 +1,5 @@
 server:
-  port: 0  # Use 0 to automatically select an available port
+  port: ${PORT:8080}  # Use 0 to automatically select an available port
   # Add this to display the selected port in the console
   address: 0.0.0.0
 

@@ -27,6 +27,19 @@
       <mockito.version>5.11.0</mockito.version>
     </properties>
 
+  <profiles>
+    <profile>
+      <id>cloud</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.h2database</groupId>
+          <artifactId>h2</artifactId>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -44,7 +57,14 @@
   </dependencyManagement>
 
   <dependencies>
-        <!-- Spring Boot Starters -->
+    <!-- Database -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
           <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -79,7 +99,19 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+          <version>42.7.8</version>
             <scope>runtime</scope>
+        </dependency>
+    <!-- Google Cloud SQL Socket Factory -->
+    <dependency>
+      <groupId>com.google.cloud.sql</groupId>
+      <artifactId>postgres-socket-factory</artifactId>
+      <version>1.27.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-secretmanager</artifactId>
+      <version>2.80.0</version>
         </dependency>
 
     <!-- In-memory DB for tests when Docker is unavailable -->

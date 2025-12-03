@@ -110,34 +110,190 @@ cd frontend
 bun run start
 ```
 
+## Production database (Cloud SQL for PostgreSQL)
+
+This service uses the `prod` Spring profile in production. In `prod`, the datasource is read from these environment
+variables:
+
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+
+For Google Cloud SQL with the Cloud SQL JDBC Socket Factory over Public IP, use a full JDBC URL like:
+
+```
+jdbc:postgresql:///gamesdb?cloudSqlInstance=games-portal-479600:northamerica-northeast1:games-postgresql-instance&socketFactory=com.google.cloud.sql.postgres.SocketFactory&ipTypes=PUBLIC&sslmode=disable
+```
+
+Where:
+
+- PROJECT: `games-portal-479600`
+- REGION: `northamerica-northeast1`
+- INSTANCE: `games-postgresql-instance`
+- INSTANCE_CONNECTION_NAME: `games-portal-479600:northamerica-northeast1:games-postgresql-instance`
+- DB_NAME: `gamesdb`
+- DB_USER: `postgres`
+
+Set the credentials accordingly:
+
+```
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=<your-strong-password>
+```
+
+### Store DB envs in Secret Manager
+
+Create three secrets and their initial versions (run once):
+
+```bash
+gcloud secrets create SPRING_DATASOURCE_URL --replication-policy=automatic
+gcloud secrets create SPRING_DATASOURCE_USERNAME --replication-policy=automatic
+gcloud secrets create SPRING_DATASOURCE_PASSWORD --replication-policy=automatic
+
+# Add secret versions
+echo -n "jdbc:postgresql:///gamesdb?cloudSqlInstance=games-portal-479600:northamerica-northeast1:games-postgresql-instance&socketFactory=com.google.cloud.sql.postgres.SocketFactory&ipTypes=PUBLIC&sslmode=disable" \
+  | gcloud secrets versions add SPRING_DATASOURCE_URL --data-file=-
+echo -n "postgres" | gcloud secrets versions add SPRING_DATASOURCE_USERNAME --data-file=-
+echo -n "<your-strong-password>" | gcloud secrets versions add SPRING_DATASOURCE_PASSWORD --data-file=-
+```
+
+Grant access to the Cloud Run runtime service account so the service can read secrets at runtime:
+
+```bash
+PROJECT=games-portal-479600
+REGION=northamerica-northeast1
+SERVICE=games-backend
+
+# Cloud Run runtime SA follows this pattern:
+RUNTIME_SA="service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com"
+
+# Get project number and export it
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+RUNTIME_SA="service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member="serviceAccount:${RUNTIME_SA}" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+Also ensure your GitHub Actions deploy service account (the one whose JSON key is stored in `GCP_SA_KEY`) has at least:
+
+- Artifact Registry Writer: `roles/artifactregistry.writer`
+- Cloud Run Admin: `roles/run.admin`
+- Service Account User on the Cloud Run runtime SA: `roles/iam.serviceAccountUser`
+- Secret Manager Accessor: `roles/secretmanager.secretAccessor`
+
+### Cloud Run deployment with Cloud SQL connector and secrets
+
+The CI workflow already deploys with:
+
+```
+--set-env-vars SPRING_PROFILES_ACTIVE=prod \
+--add-cloudsql-instances "games-portal-479600:northamerica-northeast1:games-postgresql-instance" \
+--set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
+```
+
+This attaches the Cloud SQL connector to the service and injects the DB configuration from Secret Manager. No additional
+proxy is required. The backend includes the Cloud SQL PostgreSQL Socket Factory dependency.
+
+### Manual deploy example
+
+If you want to deploy manually using the image built in Artifact Registry:
+
+```bash
+PROJECT=games-portal-479600
+REGION=northamerica-northeast1
+SERVICE=games-backend
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/games/${SERVICE}:manual"
+
+# Build and push image
+gcloud auth configure-docker "${REGION}-docker.pkg.dev"
+docker build -t "$IMAGE" -f backend/Dockerfile .
+docker push "$IMAGE"
+
+# Deploy to Cloud Run
+gcloud run deploy "$SERVICE" \
+  --region="$REGION" \
+  --image="$IMAGE" \
+  --allow-unauthenticated \
+  --set-env-vars SPRING_PROFILES_ACTIVE=prod \
+  --add-cloudsql-instances "games-portal-479600:northamerica-northeast1:games-postgresql-instance" \
+  --set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
+```
+
+Note: If you prefer a direct TCP connection via public IP without the Cloud SQL socket factory, you can also use a
+conventional JDBC URL:
+
+```
+jdbc:postgresql://<PUBLIC_IP>:5432/gamesdb
+```
+
+But in that case you must configure authorized networks, SSL, and possibly IAM DB auth; the recommended approach on
+Cloud Run is the Cloud SQL connector as shown above.
+
 ## Deploy to Google Cloud Run
 
-1. Build and push images
+We recommend using Artifact Registry (AR) for images and deploying to Cloud Run by image.
+
+### Prerequisites
+
+- Enable APIs: Artifact Registry, Cloud Run, Cloud Build, Cloud SQL Admin, Secret Manager.
+- Create a service account with roles: Cloud Run Admin, Cloud Build Editor, Artifact Registry Writer, Secret Manager
+  Accessor. Store its JSON key as repository secret `GCP_SA_KEY` (or use Workload Identity Federation for keyless).
+
+### Create Artifact Registry repository (one time)
 
 ```bash
-# set your project
-gcloud config set project <PROJECT_ID>
-# backend
-docker build -t gcr.io/<PROJECT_ID>/games-backend:latest ./backend
-docker push gcr.io/<PROJECT_ID>/games-backend:latest
-# frontend
-docker build -t gcr.io/<PROJECT_ID>/games-frontend:latest ./frontend
-docker push gcr.io/<PROJECT_ID>/games-frontend:latest
+gcloud artifacts repositories create games \
+  --repository-format=docker \
+  --location=$REGION \
+  --description="Games images"
 ```
 
-2. Configure secrets and database
-
-- Create Cloud SQL Postgres instance
-- Store secrets (JWT, DB creds, NextAuth) in Secret Manager
-
-3. Deploy services
+### Build & push images (locally)
 
 ```bash
-gcloud run services replace infra/cloudrun/backend.yaml
-gcloud run services replace infra/cloudrun/frontend.yaml
+REGION=<your-region>
+PROJECT=<your-project>
+SHA=$(git rev-parse --short HEAD)
+
+gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+docker build -t ${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA} -f backend/Dockerfile .
+docker push ${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA}
+
+docker build -t ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} -f frontend/Dockerfile .
+docker push ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA}
 ```
 
-Follow comments in `infra/cloudrun/*.yaml` to wire Cloud SQL (private IP recommended) and secrets.
+### Deploy to Cloud Run (by image)
+
+```bash
+# Backend
+gcloud run deploy games-backend \
+  --region=$REGION \
+  --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA} \
+  --allow-unauthenticated \
+  --set-env-vars SPRING_PROFILES_ACTIVE=prod
+
+# Frontend (SSR)
+gcloud run deploy games-frontend \
+  --region=$REGION \
+  --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} \
+  --allow-unauthenticated \
+  --set-env-vars NEXT_PUBLIC_API_URL=https://<backend-domain>/api
+```
+
+Optional: put Cloud CDN in front of the frontend service via HTTPS Load Balancer to cache static assets.
+
+### GitHub Actions CI/CD
+
+- Repository secrets (Settings → Secrets and variables → Actions):
+  - `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_SA_KEY` (JSON). Prefer WIF for keyless in production.
+  - Optional variables: `AR_REPO` (default `games`), `BACKEND_SERVICE` (default `games-backend`), `FRONTEND_SERVICE` (
+    default `games-frontend`), `NEXT_PUBLIC_API_URL`.
+- The workflow `.github/workflows/ci-cd.yml` builds images, pushes to AR, and deploys to Cloud Run on pushes to `main`
+  when secrets exist.
 
 ## Troubleshooting
 
@@ -145,6 +301,63 @@ Follow comments in `infra/cloudrun/*.yaml` to wire Cloud SQL (private IP recomme
 - If frontend cannot reach backend, verify `BACKEND_URL` and CORS origins
 - When Playwright fails, start dev server before running tests
 - If Testcontainers pulls are slow, pre-pull `postgres:15-alpine`
+- If Cloud Run deploy fails: confirm `GCP_PROJECT_ID`, `GCP_REGION`, and `GCP_SA_KEY` secrets; ensure the Artifact
+  Registry repo exists and you ran `gcloud auth configure-docker <region>-docker.pkg.dev` locally.
+
+## Cloud services, variables and secrets
+
+Below is a checklist of required variables/secrets and how to obtain them.
+
+### Frontend (Next.js)
+
+- `NEXTAUTH_URL` (secret): canonical site URL (e.g., https://app.example.com).
+- `NEXTAUTH_SECRET` (secret): generate with `openssl rand -base64 32`.
+- `NEXT_PUBLIC_API_URL` (variable): base URL to backend API (e.g., https://api.example.com/api or the Cloud Run backend
+  URL + `/api`).
+- Stripe (optional; behind `payments.stripe_enabled`):
+  - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (variable): from Stripe Dashboard → Developers → API keys.
+  - `STRIPE_SECRET_KEY` (secret): Stripe secret key (store in Secret Manager / GitHub Actions secret).
+  - `STRIPE_WEBHOOK_SECRET` (secret): after creating a webhook endpoint in Stripe (test mode), copy the signing secret.
+
+### Backend (Spring Boot)
+
+- Database (Cloud SQL):
+  - `SPRING_DATASOURCE_URL`: jdbc:postgresql://<PRIVATE_IP_OR_PROXY>/<DB_NAME>
+  - `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` (Secret Manager / Actions secret).
+- JWT:
+  - `APP_JWT_SECRET` (secret) and `APP_JWT_EXPIRATION_MS` (e.g., 86400000).
+- Feature flags:
+  - Unleash (default): `UNLEASH_URL`, `UNLEASH_INSTANCE_ID`/token (if secured). Or rely on built-in overlay +
+    `application.yml` defaults.
+  - flagd (dev only): `FLAGD_ENDPOINT` (optional).
+- Redis (optional): `REDIS_HOST`, `REDIS_PORT` (Memorystore). Enable with `features.cache.redis_enabled=true`.
+- Stripe (optional): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
+### GCP (CI/CD)
+
+- `GCP_PROJECT_ID` (secret): GCP project ID (e.g., my-project-123).
+- `GCP_REGION` (secret): GCP region (e.g., us-central1).
+- `GCP_SA_KEY` (secret): JSON key for a service account with roles: Cloud Run Admin, Cloud Build Editor, Artifact
+  Registry Writer, Secret Manager Accessor.
+  - Recommended: switch to Workload Identity Federation to avoid JSON keys.
+
+## Feature Flags provider
+
+Default: **Unleash** (production/staging). Optional: **flagd** (dev/local).
+
+Pros Unleash: battle-tested, UI & strategies (gradual, constraints), Postgres store, good Spring integration.
+Cons: extra service to host.
+
+Pros flagd: light & fast for local, spec-compliant (OpenFeature).
+Cons: fewer strategies/UI; better for dev than prod.
+
+We will progressively enable external providers via flags:
+
+- `payments.stripe_enabled`: internal → Stripe; cohort rollouts supported.
+- `cache.redis_enabled` / `kv.redis_enabled`: in-proc Caffeine → Memorystore.
+- `db.external_enabled`: dev embedded DB → Cloud SQL in prod.
+- `mail.provider`: smtp | ses | mailgun.
+- `realtime.provider`: spring-ws | managed; fallback to polling.
 
 ## Contributing
 

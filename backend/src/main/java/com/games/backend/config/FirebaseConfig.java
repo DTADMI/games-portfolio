@@ -9,7 +9,7 @@ import lombok.Data;
 import org.apache.commons.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -48,7 +48,7 @@ public class FirebaseConfig {
 
   @Profile("prod")
   @Bean
-  @ConditionalOnProperty(prefix = "firebase", name = "privateKey")
+  @ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText('${firebase.privateKey:}')")
   public FirebaseApp firebaseApp() throws IOException {
     LOGGER.log(Level.FINE, "Dark secret: {0}", darkSecret);
     LOGGER.log(Level.FINE, "Private key: {0}", privateKey);

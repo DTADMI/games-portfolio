@@ -5,21 +5,37 @@
 
   <!-- Production profile: ship logs to Logstash and console -->
   <springProfile name="prod">
-    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-      <destination>${LOGSTASH_HOST:-logstash}:${LOGSTASH_PORT:-5000}</destination>
-      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-        <customFields>{"app":"games-backend","environment":"prod"}</customFields>
-      </encoder>
-    </appender>
+    <if condition='property("LOGSTASH_ENABLED").equalsIgnoreCase("true")'>
+      <then>
+        <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+          <destination>${LOGSTASH_HOST:-logstash}:${LOGSTASH_PORT:-5000}</destination>
+          <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"app":"games-backend","environment":"prod"}</customFields>
+          </encoder>
+        </appender>
+      </then>
+    </if>
 
     <root level="INFO">
-      <appender-ref ref="LOGSTASH"/>
+      <!-- Only attach if enabled -->
+      <if condition='property("LOGSTASH_ENABLED").equalsIgnoreCase("true")'>
+        <then>
+          <appender-ref ref="LOGSTASH"/>
+        </then>
+      </if>
       <appender-ref ref="CONSOLE"/>
     </root>
   </springProfile>
 
-  <!-- Default/local/test profiles: log to console only -->
-  <springProfile name="default,local,test">
+  <!-- Development profile: verbose console logging -->
+  <springProfile name="dev">
+    <root level="DEBUG">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+
+  <!-- Default/local/test/Cloud profiles: log to console only with INFO level -->
+  <springProfile name="default,local,test,cloud">
     <root level="INFO">
       <appender-ref ref="CONSOLE"/>
     </root>
