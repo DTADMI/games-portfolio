@@ -50,6 +50,27 @@ public class FeatureService {
     return listAll();
   }
 
+  public boolean isEnabled(String key, boolean def) {
+    // Check overlay first
+    Object v;
+    synchronized (overlay) {
+      v = overlay.get(key);
+    }
+    if (v instanceof Boolean b) {
+      return b;
+    }
+    // Fall back to env/yaml
+    return getBool(mapKeyToYaml(key), def);
+  }
+
+  private String mapKeyToYaml(String key) {
+    // Keys like "payments.stripe_enabled" map to "features.payments.stripe_enabled"
+    if (key.startsWith("features.")) {
+      return key;
+    }
+    return "features." + key;
+  }
+
   private void put(Map<String, Object> map, String key, Object value) {
     map.put(key, value);
   }
