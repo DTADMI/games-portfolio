@@ -27,42 +27,13 @@
       <mockito.version>5.11.0</mockito.version>
     </properties>
 
-  <profiles>
-    <profile>
-      <id>cloud</id>
-      <dependencies>
-        <dependency>
-          <groupId>com.h2database</groupId>
-          <artifactId>h2</artifactId>
-          <scope>runtime</scope>
-        </dependency>
-      </dependencies>
-    </profile>
-  </profiles>
-
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4</artifactId>
-        <version>${antlr4.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-runtime</artifactId>
-        <version>${antlr4.version}</version>
-        <scope>compile</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  <!-- Rely on Spring Boot's dependency management; avoid undeclared version properties
+       that caused resolution failures for guava/protobuf/grpc/netty. If specific
+       versions are required in the future, prefer importing official BOMs rather than
+       ad-hoc version properties. -->
 
   <dependencies>
-    <!-- Database -->
-    <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
-      <scope>runtime</scope>
-    </dependency>
+    <!-- Database: use Postgres at runtime; keep H2 only for tests below to avoid duplicate declarations -->
 
     <!-- Spring Boot Starters -->
         <dependency>
