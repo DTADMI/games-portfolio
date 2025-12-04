@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "bun --cwd frontend dev",
     "dev:frontend": "bun --cwd frontend dev",
-    "dev:backend": "cd backend && mvn spring-boot:run",
+    "dev:backend": "cd backend && mvn -Pdev spring-boot:run -Dspring-boot.run.profiles=dev",
     "dev:all": "concurrently \"bun dev:frontend\" \"bun dev:backend\"",
     "build": "bun build:frontend && bun build:backend",
     "build:frontend": "bun --cwd frontend build",

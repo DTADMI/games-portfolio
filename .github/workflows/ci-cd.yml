@@ -47,7 +47,7 @@ jobs:
 
       - name: Build & Test (Maven)
         working-directory: backend
-        run: mvn -B -DskipTests=false verify
+        run: mvn -U -B -DskipTests=false verify
 
   test-frontend:
     runs-on: ubuntu-latest
