@@ -22,8 +22,12 @@ const nextConfig = {
   ],
 
   images: {
-    domains: ["images.unsplash.com", "via.placeholder.com"],
-    remotePatterns: [{ protocol: "https", hostname: "*" }],
+    // Use remotePatterns only (domains is deprecated in Next 16)
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "via.placeholder.com" },
+      { protocol: "https", hostname: "*" },
+    ],
   },
 
   experimental: {

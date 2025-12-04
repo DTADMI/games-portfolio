@@ -27,10 +27,13 @@ const nextConfig: NextConfig = {
     "@react-three/drei",
   ],
 
-  // Images: allow common sources; Cloud Run serves via HTTPS
+  // Images: use remotePatterns only (domains is deprecated in Next 16)
   images: {
-    domains: ["images.unsplash.com", "via.placeholder.com"],
-    remotePatterns: [{ protocol: "https", hostname: "*" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "via.placeholder.com" },
+      { protocol: "https", hostname: "*" },
+    ],
   },
 
   experimental: {

@@ -102,17 +102,6 @@ export default [
       next: {
         rootDir: nextConfig.rootDir,
       },
-      // Configure tailwindcss plugin so it understands our tokens and helpers
-      tailwindcss: {
-        config: path.join(__dirname, "frontend", "tailwind.config.ts"),
-        callees: ["cn", "cva", "clsx", "twMerge"],
-        classRegex: [
-          // className="..."
-          "class(Name)?",
-          // support patterns like `${inter.className}` used by next/font
-          "inter\\.className",
-        ],
-      },
       react: {
         version: "detect",
       },

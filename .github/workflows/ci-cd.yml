@@ -74,22 +74,32 @@ jobs:
   build-and-push:
     needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
-    # Only run on main when Docker Hub credentials are present; otherwise skip gracefully
-    if: ${{ github.ref == 'refs/heads/main' && vars.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set env flags for Docker Hub
+        id: hubflags
+        run: |
+          if [ -n "${{ vars.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "has_hub=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_hub=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
+        if: ${{ github.ref == 'refs/heads/main' && steps.hubflags.outputs.has_hub == 'true' }}
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        if: ${{ github.ref == 'refs/heads/main' && steps.hubflags.outputs.has_hub == 'true' }}
 
       - name: Build and push backend
         uses: docker/build-push-action@v4
+        if: ${{ github.ref == 'refs/heads/main' && steps.hubflags.outputs.has_hub == 'true' }}
         with:
           context: .
           file: ./backend/Dockerfile
@@ -98,6 +108,7 @@ jobs:
 
       - name: Build and push frontend
         uses: docker/build-push-action@v4
+        if: ${{ github.ref == 'refs/heads/main' && steps.hubflags.outputs.has_hub == 'true' }}
         with:
           context: .
           file: ./frontend/Dockerfile.monorepo
@@ -107,43 +118,60 @@ jobs:
   deploy-cloudrun:
     needs: [ test-backend, test-frontend ]
     runs-on: ubuntu-latest
-    # Deploy to Cloud Run only on main when GCP secrets are configured
-    if: ${{ github.ref == 'refs/heads/main' && secrets.GCP_PROJECT_ID != '' && secrets.GCP_REGION != '' && secrets.GCP_SA_KEY != '' }}
     permissions:
       contents: 'read'
       id-token: 'write'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up gcloud
+      - name: Set flags for GCP deploy
+        id: gcpflags
+        run: |
+          if [ -n "${{ secrets.GCP_PROJECT_ID }}" ] && [ -n "${{ secrets.GCP_REGION }}" ] && [ -n "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "can_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "can_deploy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud SDK
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
 
       - name: Configure Docker to use gcloud as a credential helper
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         run: |
           gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Compute image tags
         id: tags
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         run: |
           SHA=${GITHUB_SHA::12}
           echo "backend=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.BACKEND_SERVICE }}:${SHA}" >> $GITHUB_OUTPUT
           echo "frontend=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.FRONTEND_SERVICE }}:${SHA}" >> $GITHUB_OUTPUT
 
       - name: Build & push backend image to Artifact Registry
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         run: |
           docker build -t ${{ steps.tags.outputs.backend }} -f backend/Dockerfile .
           docker push ${{ steps.tags.outputs.backend }}
 
       - name: Build & push frontend image to Artifact Registry
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         run: |
           docker build -t ${{ steps.tags.outputs.frontend }} -f frontend/Dockerfile.monorepo .
           docker push ${{ steps.tags.outputs.frontend }}
 
       - name: Deploy backend to Cloud Run (image)
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         run: |
           gcloud run deploy ${{ env.BACKEND_SERVICE }} \
             --region="${{ secrets.GCP_REGION }}" \
@@ -155,6 +183,7 @@ jobs:
             --set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
 
       - name: Deploy frontend to Cloud Run (image)
+        if: ${{ github.ref == 'refs/heads/main' && steps.gcpflags.outputs.can_deploy == 'true' }}
         run: |
           gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
             --region="${{ secrets.GCP_REGION }}" \
@@ -166,11 +195,11 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_HOST != '' && secrets.PRODUCTION_USER != '' && secrets.SSH_PRIVATE_KEY != '' }}
     environment: production
     steps:
       - name: Deploy to production
         uses: appleboy/ssh-action@master
+        if: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_HOST != '' && secrets.PRODUCTION_USER != '' && secrets.SSH_PRIVATE_KEY != '' }}
         with:
           host: ${{ secrets.PRODUCTION_HOST }}
           username: ${{ secrets.PRODUCTION_USER }}
