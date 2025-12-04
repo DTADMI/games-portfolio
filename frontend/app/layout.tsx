@@ -5,6 +5,10 @@ import { AppSessionProvider } from "@/contexts/session-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import SoundRootProvider from "@/components/SoundRootProvider";
 import SoundControls from "@/components/SoundControls";
+import { Inter } from "next/font/google";
+
+// Self‑host fonts via next/font (no external requests, CSP friendly)
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "React Games Portfolio",
@@ -14,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <SoundRootProvider>
             <AppSessionProvider>

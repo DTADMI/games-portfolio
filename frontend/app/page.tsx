@@ -1,9 +1,3 @@
-import { GameCard } from "@/components/game-card";
-import { Header } from "@/components/header";
-import { Sidebar } from "@/components/sidebar";
-import { Button } from "@/components/ui/button";
-import { ExternalLink, Github } from "lucide-react";
-
 const REPO = process.env.NEXT_PUBLIC_REPO_URL || "";
 const featuredGames = [
   {
@@ -88,19 +82,35 @@ export default function HomePage() {
                   JavaScript Games & Interactive Projects
                 </h1>
                 <p className="text-lg text-muted-foreground mb-6 text-pretty">
-                  Welcome to my collection of interactive games and projects built with JavaScript.
-                  Each project showcases different aspects of game development, from classic arcade
-                  games to modern interactive experiences.
+                  Welcome to a curated collection of web games built with Next.js, React and
+                  TypeScript. Play instantly as a guest, or sign in to unlock leaderboards and
+                  additional features.
                 </p>
                 <div className="flex gap-4">
-                  <Button size="lg" className="gap-2">
-                    <ExternalLink className="w-4 h-4" />
-                    View All Projects
-                  </Button>
-                  <Button variant="outline" size="lg" className="gap-2 bg-transparent">
-                    <Github className="w-4 h-4" />
-                    GitHub Profile
-                  </Button>
+                  <Link href="/login">
+                    <Button size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                      <LogIn className="w-4 h-4" /> Sign in
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="gap-2 border-emerald-600 text-emerald-700 dark:text-emerald-400"
+                    >
+                      <UserPlus className="w-4 h-4" /> Sign up
+                    </Button>
+                  </Link>
+                  <Link href="/games">
+                    <Button size="lg" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                      <Gamepad2 className="w-4 h-4" /> Play as guest
+                    </Button>
+                  </Link>
+                  <a href={REPO || "#"} target="_blank" rel="noreferrer">
+                    <Button variant="ghost" size="lg" className="gap-2">
+                      <Github className="w-4 h-4" /> GitHub
+                    </Button>
+                  </a>
                 </div>
               </div>
             </section>
@@ -130,3 +140,10 @@ export default function HomePage() {
     </div>
   );
 }
+
+import { GameCard } from "@/components/game-card";
+import { Header } from "@/components/header";
+import { Sidebar } from "@/components/sidebar";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Gamepad2, Github, LogIn, UserPlus } from "lucide-react";
