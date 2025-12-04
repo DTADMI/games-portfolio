@@ -197,9 +197,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Compute SSH deploy flags
+        id: sshflags
+        run: |
+          if [ -n "${{ secrets.PRODUCTION_HOST }}" ] && [ -n "${{ secrets.PRODUCTION_USER }}" ] && [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "can_ssh=true" >> $GITHUB_OUTPUT
+          else
+            echo "can_ssh=false" >> $GITHUB_OUTPUT
+          fi
       - name: Deploy to production
         uses: appleboy/ssh-action@master
-        if: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_HOST != '' && secrets.PRODUCTION_USER != '' && secrets.SSH_PRIVATE_KEY != '' }}
+        if: ${{ github.ref == 'refs/heads/main' && steps.sshflags.outputs.can_ssh == 'true' }}
         with:
           host: ${{ secrets.PRODUCTION_HOST }}
           username: ${{ secrets.PRODUCTION_USER }}
