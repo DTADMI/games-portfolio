@@ -16,7 +16,7 @@ npm-debug.log
 **/.next/
 
 # Dependency directories
-**/bun.lockb
+# Keep lockfiles to enable deterministic builds/caching
 **/package-lock.json
 **/yarn.lock
 **/pnpm-lock.yaml

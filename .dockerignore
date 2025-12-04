@@ -14,7 +14,6 @@ npm-debug.log
 **/.next/
 
 # Dependency directories
-**/bun.lockb
 **/package-lock.json
 **/pnpm-lock.yaml
 

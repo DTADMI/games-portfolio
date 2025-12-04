@@ -1,298 +1,108 @@
-- NextAuth route: `frontend/app/api/auth/[...nextauth]/route.ts`
-- Global providers: `frontend/app/layout.tsx` wraps `ThemeProvider` and `AppSessionProvider`
-- Session hook usable in any client component: `useSession()`
-- Theme toggle component: `components/theme-toggle.tsx`
-- Minimal shadcn-like UI: `components/ui/button.tsx`
+# React Games Portfolio — Monorepo
 
-Run unit tests (Vitest + RTL):
+Welcome to the React Games Portfolio monorepo. This repository contains:
 
-```bash
-bun --cwd frontend run test
-```
+- Backend: Spring Boot service (Cloud Run) that serves REST APIs and persistence
+- Frontend: Next.js 16 app with multiple mini‑games (Cloud Run)
+- Shared libraries and game packages under `libs/` and `games/`
 
-Run e2e tests (Playwright):
+This guide gets a newcomer from zero to running locally and deploying to Google Cloud Run with CI/CD. It also documents
+the recent production changes that made the frontend resilient on Cloud Run (standalone preferred with automatic
+fallback to `next start`).
 
-````bash
-# will auto-start the dev server defined in frontend/playwright.config.ts
-cd frontend
-bun test:e2e
-```bash
+Quick links (production):
 
-In CI, Playwright browsers are installed and the E2E job runs headless with traces/screenshots on failure. Artifacts are
-available in the workflow run summary.
+- Frontend: https://games-frontend-245231653364.northamerica-northeast1.run.app/
+- Backend: https://games-backend-245231653364.northamerica-northeast1.run.app/
 
-Required env (frontend/.env.local):
+Important: the frontend must talk to the backend URL that ends with `/api`:
 
-````
+- NEXT_PUBLIC_API_URL=https://games-backend-245231653364.northamerica-northeast1.run.app/api
 
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=<long_random_string>
-BACKEND_URL=http://localhost:8080
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
+————————————————————————————————————————————————————————
 
-# Optional OAuth:
+Table of contents
 
-# GOOGLE_CLIENT_ID= ...
+1. Prerequisites
+2. Environment variables (local and CI/CD)
+3. Local development (backend + frontend)
+4. Backend: build, run, deploy
+5. Frontend: build, run, deploy
+6. CI/CD (GitHub Actions)
+7. Troubleshooting
+8. What changed and why (standalone + fallback)
 
-# GOOGLE_CLIENT_SECRET= ...
+————————————————————————————————————————————————————————
 
-# GITHUB_CLIENT_ID= ...
+1. Prerequisites
 
-# GITHUB_CLIENT_SECRET= ...
+- Node 20+ and Bun (or just Node if you prefer npm/pnpm)
+- Java 21 + Maven
+- Docker + gcloud CLI, authenticated to your GCP project
+- Artifact Registry repository (e.g., `games`) in your project
 
-````
+2. Environment variables
 
-## Backend (Spring Boot)
-
-Features:
-
-- JWT auth: `/api/auth/signup`, `/api/auth/login`
-- Rate limiting: global filter with `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`
-- Feature flags (FF4J): `GET /api/features`, `POST /api/admin/features/{uid}/toggle?enable=true|false`
-- Caching (Caffeine): `GET /api/featured` cached as `featuredGames`, eviction `POST /api/admin/cache/featured/evict`
-- Actuator health/metrics
-
-Run tests with Testcontainers:
-
-```bash
-cd backend
-mvn -q -DskipTests=false test
-````
-
-Required env (backend/.env):
+Common variables used in commands below:
 
 ```
-SPRING_PROFILES_ACTIVE=local
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=gamesdb
-DB_USER=postgres
-DB_PASSWORD=postgres
-APP_JWT_SECRET=change_me
-APP_JWT_EXPIRATION_MS=86400000
-CORS_ALLOWED_ORIGINS=http://localhost:3000
-```
-
-## Color palette & Tailwind tokens
-
-Tokens are defined in `frontend/app/globals.css` using CSS custom properties for both light and dark themes. Primary accent uses an emerald/royal-green family, with additional accents available.
-
-## Docker
-
-Build images locally:
-
-```bash
-# frontend
-docker build -t games-frontend:local ./frontend
-# backend
-docker build -t games-backend:local ./backend
-```
-
-## Start in production mode (local)
-
-1. Build everything
-
-```bash
-bun run build
-```
-
-2. Start backend jar
-
-```bash
-cd backend
-java -jar target/*.jar --spring.profiles.active=prod
-```
-
-3. Start frontend (Next.js) in production mode
-
-```bash
-cd frontend
-bun run start
-```
-
-## Production database (Cloud SQL for PostgreSQL)
-
-This service uses the `prod` Spring profile in production. In `prod`, the datasource is read from these environment
-variables:
-
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-
-For Google Cloud SQL with the Cloud SQL JDBC Socket Factory over Public IP, use a full JDBC URL like:
-
-```
-jdbc:postgresql:///gamesdb?cloudSqlInstance=games-portal-479600:northamerica-northeast1:games-postgresql-instance&socketFactory=com.google.cloud.sql.postgres.SocketFactory&ipTypes=PUBLIC&sslmode=disable
-```
-
-Where:
-
-- PROJECT: `games-portal-479600`
-- REGION: `northamerica-northeast1`
-- INSTANCE: `games-postgresql-instance`
-- INSTANCE_CONNECTION_NAME: `games-portal-479600:northamerica-northeast1:games-postgresql-instance`
-- DB_NAME: `gamesdb`
-- DB_USER: `postgres`
-
-Set the credentials accordingly:
-
-```
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=<your-strong-password>
-```
-
-### Store DB envs in Secret Manager
-
-Create three secrets and their initial versions (run once):
-
-```bash
-gcloud secrets create SPRING_DATASOURCE_URL --replication-policy=automatic
-gcloud secrets create SPRING_DATASOURCE_USERNAME --replication-policy=automatic
-gcloud secrets create SPRING_DATASOURCE_PASSWORD --replication-policy=automatic
-
-# Add secret versions
-echo -n "jdbc:postgresql:///gamesdb?cloudSqlInstance=games-portal-479600:northamerica-northeast1:games-postgresql-instance&socketFactory=com.google.cloud.sql.postgres.SocketFactory&ipTypes=PUBLIC&sslmode=disable" \
-  | gcloud secrets versions add SPRING_DATASOURCE_URL --data-file=-
-echo -n "postgres" | gcloud secrets versions add SPRING_DATASOURCE_USERNAME --data-file=-
-echo -n "<your-strong-password>" | gcloud secrets versions add SPRING_DATASOURCE_PASSWORD --data-file=-
-```
-
-Grant access to the Cloud Run runtime service account so the service can read secrets at runtime:
-
-```bash
-PROJECT=games-portal-479600
 REGION=northamerica-northeast1
-SERVICE=games-backend
-
-# Cloud Run runtime SA follows this pattern:
-RUNTIME_SA="service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com"
-
-# Get project number and export it
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
-RUNTIME_SA="service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com"
-
-gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member="serviceAccount:${RUNTIME_SA}" \
-  --role="roles/secretmanager.secretAccessor"
-```
-
-Also ensure your GitHub Actions deploy service account (the one whose JSON key is stored in `GCP_SA_KEY`) has at least:
-
-- Artifact Registry Writer: `roles/artifactregistry.writer`
-- Cloud Run Admin: `roles/run.admin`
-- Service Account User on the Cloud Run runtime SA: `roles/iam.serviceAccountUser`
-- Secret Manager Accessor: `roles/secretmanager.secretAccessor`
-
-### Cloud Run deployment with Cloud SQL connector and secrets
-
-The CI workflow deploys the backend to Cloud Run using the Cloud SQL connector and Secret Manager for the database
-credentials. No sidecar proxy is required because the backend uses the Cloud SQL PostgreSQL Socket Factory dependency.
-
-It sets at least the following:
-
-```
---set-env-vars SPRING_PROFILES_ACTIVE=prod \
---add-cloudsql-instances "games-portal-479600:northamerica-northeast1:games-postgresql-instance" \
---set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
-```
-
-### Manual deploy example (backend → Cloud Run)
-
-If you want to deploy manually using the image in Artifact Registry and the current production shape of the service:
-
-```bash
 PROJECT=games-portal-479600
-REGION=northamerica-northeast1
-SERVICE=games-backend
-IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/games/${SERVICE}:manual"
-
-# Build and push image
-gcloud auth configure-docker "${REGION}-docker.pkg.dev"
-docker build -t "$IMAGE" -f backend/Dockerfile .
-docker push "$IMAGE"
-
-# Deploy to Cloud Run (includes DB secrets, Firebase creds, and FRONTEND_URL)
-FRONTEND_URL="https://<your-frontend-domain>"
-
-gcloud run deploy "$SERVICE" \
-  --project="$PROJECT" \
-  --region="$REGION" \
-  --image="$IMAGE" \
-  --allow-unauthenticated \
-  --port=8080 \
-  --add-cloudsql-instances "games-portal-479600:northamerica-northeast1:games-postgresql-instance" \
-  --set-env-vars SPRING_PROFILES_ACTIVE=prod,FRONTEND_URL="$FRONTEND_URL" \
-  --set-secrets "\
-SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,\
-SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,\
-SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest,\
-NEXT_FIREBASE_CREDS_TYPE=NEXT_FIREBASE_CREDS_TYPE:latest,\
-NEXT_FIREBASE_CREDS_PROJECT_ID=NEXT_FIREBASE_CREDS_PROJECT_ID:latest,\
-NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID=NEXT_FIREBASE_CREDS_PRIVATE_KEY_ID:latest,\
-NEXT_FIREBASE_CREDS_PRIVATE_KEY=NEXT_FIREBASE_CREDS_PRIVATE_KEY:latest,\
-NEXT_FIREBASE_CREDS_CLIENT_EMAIL=NEXT_FIREBASE_CREDS_CLIENT_EMAIL:latest,\
-NEXT_FIREBASE_CREDS_CLIENT_ID=NEXT_FIREBASE_CREDS_CLIENT_ID:latest,\
-NEXT_FIREBASE_CREDS_AUTH_URI=NEXT_FIREBASE_CREDS_AUTH_URI:latest,\
-NEXT_FIREBASE_CREDS_TOKEN_URI=NEXT_FIREBASE_CREDS_TOKEN_URI:latest,\
-NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL=NEXT_FIREBASE_CREDS_AUTH_PROVIDER_X509_CERT_URL:latest,\
-NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL=NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL:latest,\
-NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN=NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN:latest"
-```
-
-Note: If you prefer a direct TCP connection via public IP without the Cloud SQL socket factory, you can also use a
-conventional JDBC URL:
-
-```
-jdbc:postgresql://<PUBLIC_IP>:5432/gamesdb
-```
-
-But in that case you must configure authorized networks, SSL, and possibly IAM DB auth; the recommended approach on
-Cloud Run is the Cloud SQL connector as shown above.
-
-## Deploy to Google Cloud Run
-
-We recommend using Artifact Registry (AR) for images and deploying to Cloud Run by image.
-
-### Prerequisites
-
-- Enable APIs: Artifact Registry, Cloud Run, Cloud Build, Cloud SQL Admin, Secret Manager.
-- Create a service account with roles: Cloud Run Admin, Cloud Build Editor, Artifact Registry Writer, Secret Manager
-  Accessor. Store its JSON key as repository secret `GCP_SA_KEY` (or use Workload Identity Federation for keyless).
-
-### Create Artifact Registry repository (one time)
-
-```bash
-gcloud artifacts repositories create games \
-  --repository-format=docker \
-  --location=$REGION \
-  --description="Games images"
-```
-
-### Build & push images (locally)
-
-```bash
-REGION=<your-region>
-PROJECT=<your-project>
+AR_REPO=games
+BACKEND_SERVICE=games-backend
+FRONTEND_SERVICE=games-frontend
 SHA=$(git rev-parse --short HEAD)
 
-gcloud auth configure-docker ${REGION}-docker.pkg.dev
+# Production service URLs
+FRONTEND_URL=https://games-frontend-245231653364.northamerica-northeast1.run.app
+BACKEND_URL=https://games-backend-245231653364.northamerica-northeast1.run.app
 
-docker build -t ${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA} -f backend/Dockerfile .
-docker push ${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA}
-
-docker build -t ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} -f frontend/Dockerfile .
-docker push ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA}
+# Frontend must receive the backend URL WITH /api suffix
+NEXT_PUBLIC_API_URL=${BACKEND_URL}/api
 ```
 
-### Deploy to Cloud Run (by image)
+3. Local development
 
-```bash
-# Backend
-gcloud run deploy games-backend \
+- Install dependencies once at the repo root to resolve all workspaces:
+
+```
+bun install
+```
+
+- Run backend locally (uses `application.yml`, port 3000 by default):
+
+```
+cd backend
+mvn spring-boot:run
+```
+
+- Run frontend locally (config proxies `/api/*` to `NEXT_PUBLIC_API_URL`):
+
+```
+cd frontend
+export NEXT_PUBLIC_API_URL=http://localhost:3000/api
+PORT=8080 bun run dev
+```
+
+Frontend will run on http://localhost:8080 and call the backend (http://localhost:3000) via `/api/*` rewrites.
+
+4. Backend — build, run, deploy
+
+Build image and push to Artifact Registry:
+
+```
+docker build -t ${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/${BACKEND_SERVICE}:${SHA} -f backend/Dockerfile .
+docker push ${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/${BACKEND_SERVICE}:${SHA}
+```
+
+Deploy to Cloud Run:
+
+```
+gcloud run deploy ${BACKEND_SERVICE} \
   --region=$REGION \
-  --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-backend:${SHA} \
+  --image=${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/${BACKEND_SERVICE}:${SHA} \
   --allow-unauthenticated \
-  --port=8080 \
+  --port=3000 \
   --set-env-vars SPRING_PROFILES_ACTIVE=prod \
   --add-cloudsql-instances "${PROJECT}:${REGION}:games-postgresql-instance" \
   --set-secrets "\
@@ -312,14 +122,115 @@ NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_URL=NEXT_FIREBASE_CREDS_CLIENT_X509_CERT_UR
 NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN=NEXT_FIREBASE_CREDS_UNIVERSE_DOMAIN:latest"
 
 # Frontend (SSR)
+# Next.js listens on PORT provided by Cloud Run; we deploy the service listening on 8080.
 gcloud run deploy games-frontend \
   --region=$REGION \
   --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} \
   --allow-unauthenticated \
+  --port=8080 \
   --set-env-vars NEXT_PUBLIC_API_URL=https://<backend-domain>/api
 ```
 
 Optional: put Cloud CDN in front of the frontend service via HTTPS Load Balancer to cache static assets.
+
+### Frontend builds in a monorepo (workspace dependencies)
+
+The frontend depends on local workspace packages (e.g., `@games/shared`, `@games/breakout`, etc.) located under `libs/`
+and `games/`.
+
+- If you use the small frontend-only build context (`-f frontend/Dockerfile ./frontend`), those workspaces are outside
+  the context and cannot be resolved by Bun, resulting in errors like "Workspace dependency not found."
+- For CI/CD and production, use the monorepo-aware Dockerfile which copies only the necessary folders and installs at
+  the repository root so workspaces resolve correctly:
+
+Build from repo root with Dockerfile.monorepo:
+
+```bash
+REGION=<your-region>
+PROJECT=<your-project>
+SHA=$(git rev-parse --short HEAD)
+
+docker build \
+  -t ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} \
+  -f frontend/Dockerfile.monorepo \
+  .
+
+docker push ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA}
+
+gcloud run deploy games-frontend \
+  --region=$REGION \
+  --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} \
+  --allow-unauthenticated \
+  --port=8080 \
+  --set-env-vars NEXT_PUBLIC_API_URL=https://<backend-domain>/api
+```
+
+Notes:
+
+- For fully reproducible installs, generate and commit `frontend/bun.lockb` (run `bun --cwd frontend install` once, then
+  commit the lockfile).
+- The existing `frontend/Dockerfile` remains useful for local iteration when you copy or publish dependencies into the
+  frontend, but for the current monorepo layout prefer `frontend/Dockerfile.monorepo`.
+
+#### Troubleshooting: Cloud Run container didn’t listen on the expected port (frontend 8080)
+
+Next.js `next start` listens on port 3000 by default. Cloud Run health checks expect your container to listen on the
+port provided in the `PORT` environment variable (we deploy the frontend on 8080). You can fix this in one of two ways:
+
+- Easiest: deploy the frontend with `--port=8080` (as shown above) so Cloud Run targets 8080 for health checks and
+  traffic.
+- Alternatively: change the frontend start script to bind to the `PORT` env automatically so no `--port` flag is needed:
+
+  ```json
+  {
+    "scripts": {
+      "start": "next start -p ${PORT:-8080}"
+    }
+  }
+  ```
+
+With the script change, Cloud Run will set `PORT` and the app will listen on it (8080 in our deployment).
+
+---
+
+## Strategy: ship new games without rebuilding the whole app
+
+Today the Next.js app statically imports game packages from the monorepo. That means a new game (or version) normally
+requires rebuilding the frontend image so the new code is included in the bundle. If the goal is to publish or update a
+game independently, there are a few approaches (in increasing decoupling order):
+
+1. Versioned packages in a registry (build-time coupling)
+
+- Publish each game as `@games/<name>` to a private registry (Artifact Registry npm or GitHub Packages).
+- The frontend depends on semver ranges. Updating a game means bumping the version and rebuilding the frontend to pull
+  it.
+- Pros: simple DX; keeps code sharing via packages. Cons: still requires a frontend rebuild to pick up a new version.
+
+2. Runtime-loaded remote modules (strong decoupling; no frontend rebuild)
+
+- Bundle each game as a standalone ESM artifact (e.g., upload to Cloud Storage/Cloud CDN) and load via `import()` at
+  runtime from a versioned URL. Serve a small manifest (JSON) mapping game slugs to versioned URLs; the frontend reads
+  it and dynamic-imports.
+- Pros: deploy a new game by uploading artifacts and updating the manifest; no frontend image rebuild required (as
+  long as contracts stay compatible). Cons: slightly more complex infra; need cache-busting and integrity controls.
+
+3. Micro-frontends per game (highest isolation)
+
+- Host each game as its own service (Cloud Run) and embed via iframe or Module Federation. Pros: independent
+  deployments and scaling. Cons: more moving parts and potential UX/network overhead.
+
+Recommended path for this repo:
+
+- Stage A (now, implemented): use a monorepo-aware build (`frontend/Dockerfile.monorepo`) so the CI/CD pipeline reliably
+  builds the current architecture.
+- Stage B (optional, near future): introduce a "remote game" plugin path for selected games:
+  - Build step emits game bundles to a CDN bucket `games/<slug>/<version>/index.js`.
+  - Backend (or a static file) serves a `games-manifest.json` with URLs.
+  - Frontend uses `dynamic import()` to load the game module at runtime based on the manifest.
+- Stage C (later, if needed): evolve to Module Federation or per-game services.
+
+This lets you ship new games (or rollback) by updating CDN assets/manifests, without a full frontend rebuild, while
+preserving an easy monorepo for shared utilities.
 
 ### Required Firebase credential secrets
 
@@ -378,7 +289,7 @@ After a successful deploy, the service root `/` is protected by Spring Security 
 Use the public health-like endpoint and actuator health check:
 
 ```bash
-SERVICE_URL="https://<games-backend-xxxxxx-<region>.run.app>"
+SERVICE_URL=${BACKEND_URL}
 curl -sS "$SERVICE_URL/healthz"
 curl -sS "$SERVICE_URL/actuator/health"
 ```
@@ -528,3 +439,86 @@ Planned, feature-flagged improvements for engagement:
 - Realtime: basic presence and live leaderboard via backend WebSocket channel
 
 Please confirm which game to prioritize for the first multiplayer prototype (Snake or Breakout recommended). Once confirmed, we’ll wire the backend WS topic, add client hooks, and ship tests (integration + e2e).
+
+# Frontend (Cloud Run) — Build & Deploy from Monorepo
+
+The frontend uses a monorepo‑aware Dockerfile and must be built from the repository root so local workspace packages (
+`libs/`, `games/`) are available to the build.
+
+Important notes:
+
+- Always run `docker build` from the repo root with `-f frontend/Dockerfile.monorepo .` (trailing dot is the context).
+- The runtime image includes both Next.js standalone output and a robust launcher that prefers the standalone server but
+  will fall back to `next start` if needed. It binds to `0.0.0.0` on the port exposed by Cloud Run (`$PORT`).
+- Set `NEXT_PUBLIC_API_URL` to the backend base URL that includes `/api`. For production in this project, use:
+
+```
+NEXT_PUBLIC_API_URL=${BACKEND_URL}/api
+```
+
+Build and push (Artifact Registry):
+
+```
+docker build --no-cache \
+  -t ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} \
+  -f frontend/Dockerfile.monorepo .
+
+docker push ${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA}
+```
+
+Deploy to Cloud Run:
+
+```
+gcloud run deploy ${SERVICE_FRONT} \
+  --region=${REGION} \
+  --image=${REGION}-docker.pkg.dev/${PROJECT}/games/games-frontend:${SHA} \
+  --allow-unauthenticated \
+  --port=8080 \
+  --set-env-vars NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+```
+
+What happens at runtime:
+
+- The image contains `.next/standalone` and the full `.next` build artifacts, plus `node_modules`.
+- An entrypoint script under `/app/standalone/run.sh` tries common standalone server filenames first (e.g., `server.js`,
+  `server.mjs`, `server/index.js`).
+- If no standalone entry is found, it runs `next start -H 0.0.0.0 -p $PORT` from the bundled `node_modules` with the
+  copied `.next` assets.
+
+Troubleshooting (frontend):
+
+- If Cloud Run says the container didn’t listen on the expected port, open the revision logs. You should see
+  `[launcher]` messages:
+  - `Found standalone entry: ...` → standalone startup.
+  - `Falling back to Next CLI from: ...` → `next start` fallback.
+- Verify you deployed the frontend with `--port=8080` and that `NEXT_PUBLIC_API_URL` points at a reachable backend URL (
+  ending with `/api`).
+- Ensure you built from the repository root; otherwise, the monorepo workspaces won’t resolve.
+
+# CI/CD (GitHub Actions)
+
+This repo ships a single workflow at `.github/workflows/ci-cd.yml` which:
+
+- Runs backend tests (Maven) and frontend lint/tests/build
+- Builds and pushes images to Artifact Registry
+- Deploys `games-backend` and `games-frontend` to Cloud Run
+
+Provide these repository variables and secrets:
+
+- Secrets: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_SA_KEY` (JSON), and DB secret names used in the backend deploy step
+- Vars: `AR_REPO=games`, `BACKEND_SERVICE=games-backend`, `FRONTEND_SERVICE=games-frontend`,
+  `NEXT_PUBLIC_API_URL=https://games-backend-245231653364.northamerica-northeast1.run.app/api`
+
+On a push to `main`, the workflow will build, push, and deploy. The frontend step sets `--port=8080` and passes
+`NEXT_PUBLIC_API_URL` to the container.
+
+# What changed and why (Frontend runtime)
+
+- The container now starts via `frontend/docker/run.sh`, which:
+  - Prefers the Next.js standalone server entry when present (`.next/standalone`)
+  - Falls back to `next start` using the copied `.next` assets and full `node_modules` when standalone isn’t emitted
+- We added `assetPrefix: '/'` in `next.config.*` so static assets and chunks are requested with absolute paths (
+  `/_next/...`), fixing 404s on nested routes in Cloud Run.
+
+With these changes, the service reliably binds to `0.0.0.0:$PORT`, passes health checks, and the UI loads its chunks and
+styles correctly.

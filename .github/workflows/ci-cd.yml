@@ -100,7 +100,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./frontend/Dockerfile
+          file: ./frontend/Dockerfile.monorepo
           push: true
           tags: ${{ vars.DOCKERHUB_USERNAME }}/games-frontend:latest
 
@@ -140,7 +140,7 @@ jobs:
 
       - name: Build & push frontend image to Artifact Registry
         run: |
-          docker build -t ${{ steps.tags.outputs.frontend }} -f frontend/Dockerfile .
+          docker build -t ${{ steps.tags.outputs.frontend }} -f frontend/Dockerfile.monorepo .
           docker push ${{ steps.tags.outputs.frontend }}
 
       - name: Deploy backend to Cloud Run (image)
@@ -149,6 +149,7 @@ jobs:
             --region="${{ secrets.GCP_REGION }}" \
             --image=${{ steps.tags.outputs.backend }} \
             --allow-unauthenticated \
+            --port=3000 \
             --set-env-vars SPRING_PROFILES_ACTIVE=prod \
             --add-cloudsql-instances "${{ vars.GCP_INSTANCE_CONNECTION_NAME || secrets.GCP_INSTANCE_CONNECTION_NAME }}" \
             --set-secrets "SPRING_DATASOURCE_URL=SPRING_DATASOURCE_URL:latest,SPRING_DATASOURCE_USERNAME=SPRING_DATASOURCE_USERNAME:latest,SPRING_DATASOURCE_PASSWORD=SPRING_DATASOURCE_PASSWORD:latest"
@@ -159,7 +160,8 @@ jobs:
             --region="${{ secrets.GCP_REGION }}" \
             --image=${{ steps.tags.outputs.frontend }} \
             --allow-unauthenticated \
-            --set-env-vars NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://example-api' }}
+            --port=8080 \
+            --set-env-vars NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://games-backend-245231653364.northamerica-northeast1.run.app/api' }}
 
   deploy:
     needs: build-and-push

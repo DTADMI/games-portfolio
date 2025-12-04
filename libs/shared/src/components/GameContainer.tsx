@@ -1,5 +1,5 @@
 // libs/shared/src/components/GameContainer.tsx
-import React, { type ReactElement, ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import { ErrorBoundary } from "../lib/ErrorBoundary";
 
 export interface GameContainerProps {
@@ -9,13 +9,9 @@ export interface GameContainerProps {
   className?: string;
 }
 
-// Use a function component with explicit return type
-function GameContainer({
-  children,
-  title,
-  description,
-  className = "",
-}: GameContainerProps): ReactElement {
+// Prefer a standard function component that explicitly returns JSX.Element
+// This avoids React.FC typing nuances (e.g., ReactNode | Promise<ReactNode> in some type versions)
+function GameContainer({ children, title, description, className = "" }: GameContainerProps) {
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${className}`}>
       <div className="container mx-auto px-4 py-8">

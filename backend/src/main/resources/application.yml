@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8080}  # Use 0 to automatically select an available port
+  port: ${PORT:3000}  # Cloud Run passes $PORT; default to 3000 for backend
   # Add this to display the selected port in the console
   address: 0.0.0.0
 
@@ -55,7 +55,7 @@ features:
 
 # CORS Configuration
 cors:
-  allowed-origins: "http://localhost:3000,http://localhost:3001"
+  allowed-origins: "http://localhost:8080,http://localhost:3001"
   allowed-methods: "GET, POST, PUT, DELETE, OPTIONS"
   allowed-headers: "*"
   allow-credentials: true

@@ -1,0 +1,83 @@
+## Monorepo-friendly Dockerfile for the frontend
+# IMPORTANT: You MUST build from the REPOSITORY ROOT as context, NOT ./frontend.
+# Correct example:
+#   docker build -t <IMAGE> -f frontend/Dockerfile.monorepo .
+#
+# Why: the frontend depends on local workspace packages (libs/, games/, etc.).
+# Using ./frontend as the build context will make these folders unavailable in the
+# Docker context and cause errors like "COPY <path>: not found" or Bun workspace
+# resolution failures.
+#
+# This Dockerfile copies only the necessary folders (frontend, libs, games, and a
+# few root files) so Bun can resolve workspaces during install and build while still
+# keeping the context smaller than the full repo with build outputs.
+
+FROM oven/bun:1.3.2-alpine AS builder
+
+WORKDIR /app
+
+# Copy the frontend application FIRST so a wrong build context fails with a clear error
+# (If you mistakenly build with ./frontend as context, this step will fail.)
+COPY frontend ./frontend
+
+# Copy root files needed for workspace resolution and TypeScript base config
+COPY package.json ./
+COPY pnpm-workspace.yaml ./
+COPY tsconfig.base.json ./
+COPY eslint.config.mjs ./
+COPY components.json ./
+
+# Copy workspace packages used by the frontend
+COPY libs ./libs
+COPY games ./games
+
+# Validate expected monorepo layout exists (helps produce a clearer error early)
+RUN test -d frontend -a -d libs -a -d games || (echo "[ERROR] Monorepo build expects 'frontend/', 'libs/', and 'games/' at the repository root.\nBuild from repo root: docker build -t <IMAGE> -f frontend/Dockerfile.monorepo ." && exit 1)
+
+# Install dependencies at the monorepo root so workspaces resolve
+RUN if [ -f frontend/bun.lockb ]; then \
+      echo "Using frontend/bun.lockb for deterministic monorepo install"; \
+      bun install --frozen-lockfile; \
+    else \
+      echo "frontend/bun.lockb not found; running non-frozen monorepo install"; \
+      bun install; \
+    fi
+
+# Build the frontend app with Node to avoid edge-runtime polyfill gaps under Bun
+RUN apk add --no-cache nodejs && \
+    export NEXT_STANDALONE=true && \
+    export NEXT_TELEMETRY_DISABLED=1 && \
+    cd frontend && \
+    (node ./node_modules/next/dist/bin/next build || node ../node_modules/next/dist/bin/next build)
+
+###############################################
+# Runtime image: Node 20 with Next standalone #
+###############################################
+FROM node:24-alpine AS runtime
+
+WORKDIR /app
+
+# Keep standalone tree under a subfolder for predictable paths
+COPY --from=builder /app/frontend/.next/standalone ./standalone
+COPY --from=builder /app/frontend/public ./standalone/public
+
+# Also copy full build artifacts and dependencies to enable reliable `next start` fallback
+# - Some Next versions may not emit a top-level server entry in standalone output
+# - Ensure all runtime deps exist in runtime and that `.next` contains all required assets
+# Copy full node_modules to ensure all runtime deps exist for `next start` (e.g., styled-jsx)
+COPY --from=builder /app/frontend/node_modules ./standalone/node_modules
+COPY --from=builder /app/frontend/.next ./standalone/.next
+
+# Expose the port Next will bind to (Cloud Run provides $PORT)
+EXPOSE 8080
+
+# Copy the robust launcher that prefers standalone, falls back to `next start`
+COPY frontend/docker/run.sh ./standalone/run.sh
+RUN chmod +x ./standalone/run.sh
+
+# Prefer running from the standalone directory
+WORKDIR /app/standalone
+
+# Start via the launcher (binds to 0.0.0.0 and respects $PORT)
+CMD ["./run.sh"]
+
